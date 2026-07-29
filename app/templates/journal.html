@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Jurnal - Monitoring PKL</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+      <div class="container">
+        <a class="navbar-brand" href="/dashboard">Monitoring PKL</a>
+      </div>
+    </nav>
+    <div class="container py-4">
+      <h2 class="mb-4">Jurnal Kegiatan</h2>
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+          <h5>Tambah Jurnal</h5>
+          <form method="post" class="row g-2">
+            <div class="col-md-4">
+              <select class="form-select" name="user_id">
+                {% for user in users %}
+                <option value="{{ user.id }}">{{ user.username }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4"><input class="form-control" name="kegiatan" placeholder="Kegiatan" required></div>
+            <div class="col-md-4"><input class="form-control" name="output" placeholder="Output"></div>
+            <div class="col-md-12"><button class="btn btn-primary w-100">Simpan</button></div>
+          </form>
+        </div>
+      </div>
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <table class="table table-striped">
+            <thead><tr><th>#</th><th>User</th><th>Kegiatan</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for item in journals %}
+              <tr><td>{{ item.id }}</td><td>{{ item.user_id }}</td><td>{{ item.kegiatan }}</td><td>{{ item.status }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
