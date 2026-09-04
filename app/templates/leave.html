@@ -1,0 +1,83 @@
+{% extends "layout.html" %}
+{% block title %}Permohonan Izin{% endblock %}
+{% block page_title %}Permohonan Izin PKL{% endblock %}
+
+{% block content %}
+{% if current_user.role == 'peserta' %}
+<section class="panel-card mb-3 panel-elevated">
+  <h5>Ajukan Permohonan Izin</h5>
+  <form method="post" action="/leave" class="row g-2 mt-1">
+    <div class="col-lg-3">
+      <label class="form-label">Tanggal Izin</label>
+      <input class="form-control" type="date" name="tanggal" required>
+    </div>
+    <div class="col-lg-2">
+      <label class="form-label">Jenis</label>
+      <select class="form-select" name="jenis" required>
+        <option value="izin">Izin</option>
+        <option value="sakit">Sakit</option>
+      </select>
+    </div>
+    <div class="col-lg-5">
+      <label class="form-label">Keterangan</label>
+      <input class="form-control" name="keterangan" placeholder="Alasan izin..." required>
+    </div>
+    <div class="col-lg-2 d-flex align-items-end">
+      <button class="btn btn-primary w-100">Ajukan</button>
+    </div>
+  </form>
+</section>
+{% endif %}
+
+<section class="panel-card panel-elevated">
+  <h5>{% if can_manage %}Semua Permohonan Izin{% else %}Permohonan Izin Saya{% endif %}</h5>
+  <div class="table-responsive mt-2">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>#</th>
+          {% if can_manage %}<th>Peserta</th>{% endif %}
+          <th>Tanggal</th>
+          <th>Jenis</th>
+          <th>Keterangan</th>
+          <th>Status</th>
+          <th>Catatan Reviewer</th>
+          {% if can_manage %}<th>Aksi</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for leave in leaves %}
+        <tr>
+          <td>{{ leave.id }}</td>
+          {% if can_manage %}<td>{{ leave.user.username if leave.user else leave.user_id }}</td>{% endif %}
+          <td>{{ leave.tanggal.strftime('%d/%m/%Y') if leave.tanggal else '-' }}</td>
+          <td><span class="badge {% if leave.jenis == 'sakit' %}text-bg-danger{% else %}text-bg-info{% endif %}">{{ leave.jenis or 'izin' }}</span></td>
+          <td>{{ leave.keterangan }}</td>
+          <td>
+            <span class="badge {% if leave.status == 'approved' %}text-bg-success{% elif leave.status == 'rejected' %}text-bg-danger{% else %}text-bg-warning{% endif %}">
+              {% if leave.status == 'approved' %}Disetujui{% elif leave.status == 'rejected' %}Ditolak{% else %}Menunggu{% endif %}
+            </span>
+          </td>
+          <td class="text-muted small">{{ leave.catatan_reviewer or '-' }}</td>
+          {% if can_manage %}
+          <td>
+            {% if leave.status == 'pending' %}
+            <form method="post" action="/leave/{{ leave.id }}/review" class="d-flex gap-1">
+              <input class="form-control form-control-sm" name="catatan" placeholder="Catatan..." style="max-width:140px">
+              <button class="btn btn-sm btn-success" name="action" value="approved">✓</button>
+              <button class="btn btn-sm btn-danger" name="action" value="rejected">✗</button>
+            </form>
+            {% else %}
+            <span class="text-muted small">{{ leave.reviewer.username if leave.reviewer else '-' }}</span>
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="{{ 8 if can_manage else 6 }}" class="text-center text-muted py-3">Belum ada permohonan izin.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

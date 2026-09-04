@@ -1,0 +1,29 @@
+{
+  "name": "Monitoring PKL — Diskominfo Batu Bara",
+  "short_name": "Monitoring PKL",
+  "description": "Sistem monitoring PKL digital Diskominfo Kabupaten Batu Bara",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {"name": "Dashboard", "url": "/dashboard", "description": "Buka dashboard"},
+    {"name": "Absensi", "url": "/attendance", "description": "Buka halaman absensi"},
+    {"name": "Jurnal", "url": "/journal", "description": "Buka jurnal harian"}
+  ]
+}

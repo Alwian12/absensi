@@ -1,48 +1,157 @@
-<!doctype html>
-<html lang="id">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Jurnal - Monitoring PKL</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  </head>
-  <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-      <div class="container">
-        <a class="navbar-brand" href="/dashboard">Monitoring PKL</a>
-      </div>
-    </nav>
-    <div class="container py-4">
-      <h2 class="mb-4">Jurnal Kegiatan</h2>
-      <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body">
-          <h5>Tambah Jurnal</h5>
-          <form method="post" class="row g-2">
-            <div class="col-md-4">
-              <select class="form-select" name="user_id">
-                {% for user in users %}
-                <option value="{{ user.id }}">{{ user.username }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="col-md-4"><input class="form-control" name="kegiatan" placeholder="Kegiatan" required></div>
-            <div class="col-md-4"><input class="form-control" name="output" placeholder="Output"></div>
-            <div class="col-md-12"><button class="btn btn-primary w-100">Simpan</button></div>
-          </form>
-        </div>
-      </div>
-      <div class="card shadow-sm border-0">
-        <div class="card-body">
-          <table class="table table-striped">
-            <thead><tr><th>#</th><th>User</th><th>Kegiatan</th><th>Status</th></tr></thead>
-            <tbody>
-              {% for item in journals %}
-              <tr><td>{{ item.id }}</td><td>{{ item.user_id }}</td><td>{{ item.kegiatan }}</td><td>{{ item.status }}</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+{% extends "layout.html" %}
+{% from '_pagination.html' import pagination %}
+
+{% block title %}Jurnal - Monitoring PKL{% endblock %}
+{% block page_title %}{{ journal_page_title }}{% endblock %}
+
+{% block content %}
+{% set journal_stats = namespace(approved=0, pending=0, rejected=0, other=0) %}
+{% for item in journals %}
+  {% set status = (item.status or '')|lower %}
+  {% if status in ['approved', 'disetujui', 'valid'] %}
+    {% set journal_stats.approved = journal_stats.approved + 1 %}
+  {% elif status in ['pending', 'draft', 'menunggu'] %}
+    {% set journal_stats.pending = journal_stats.pending + 1 %}
+  {% elif status in ['rejected', 'ditolak', 'invalid'] %}
+    {% set journal_stats.rejected = journal_stats.rejected + 1 %}
+  {% else %}
+    {% set journal_stats.other = journal_stats.other + 1 %}
+  {% endif %}
+{% endfor %}
+
+<section class="panel-card page-hero page-hero-journal mb-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+    <div class="hero-title-wrap">
+      <span class="hero-glyph" aria-hidden="true">
+        <svg viewBox="0 0 24 24" role="img" focusable="false" aria-hidden="true">
+          <path d="M5 4h12a2 2 0 0 1 2 2v13l-4-2-4 2-4-2-4 2V6a2 2 0 0 1 2-2z"></path>
+          <path d="M7 8h8"></path>
+          <path d="M7 12h8"></path>
+        </svg>
+      </span>
+      <div>
+      <h5 class="mb-0">{{ journal_page_title }}</h5>
       </div>
     </div>
-  </body>
-</html>
+    <span class="summary-badge">{{ journals|length }} entri</span>
+  </div>
+  <div class="row g-2 mt-2 mini-metric-row">
+    <div class="col-sm-3">
+      <div class="mini-metric mini-metric-high">
+        <span class="mini-metric-label">Disetujui</span>
+        <strong class="mini-metric-value">{{ journal_stats.approved }}</strong>
+      </div>
+    </div>
+    <div class="col-sm-3">
+      <div class="mini-metric mini-metric-mid">
+        <span class="mini-metric-label">Menunggu</span>
+        <strong class="mini-metric-value">{{ journal_stats.pending }}</strong>
+      </div>
+    </div>
+    <div class="col-sm-3">
+      <div class="mini-metric mini-metric-low">
+        <span class="mini-metric-label">Ditolak</span>
+        <strong class="mini-metric-value">{{ journal_stats.rejected }}</strong>
+      </div>
+    </div>
+    <div class="col-sm-3">
+      <div class="mini-metric mini-metric-neutral">
+        <span class="mini-metric-label">Lainnya</span>
+        <strong class="mini-metric-value">{{ journal_stats.other }}</strong>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="panel-card mb-3 panel-elevated">
+  <h5>{% if can_manage_journal %}Tambah &amp; Verifikasi{% else %}Tambah Jurnal{% endif %}</h5>
+  <form method="post" class="row g-2 mt-1">
+    {% if can_manage_journal %}
+    <div class="col-lg-3">
+      <select class="form-select" name="user_id" required>
+        {% for user in users %}
+        <option value="{{ user.id }}">{{ user.username }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-lg-5"><input class="form-control" name="kegiatan" placeholder="Kegiatan" required></div>
+    <div class="col-lg-3"><input class="form-control" name="output" placeholder="Output"></div>
+    {% else %}
+    <div class="col-lg-8"><input class="form-control" name="kegiatan" placeholder="Kegiatan" required></div>
+    <div class="col-lg-3"><input class="form-control" name="output" placeholder="Output"></div>
+    {% endif %}
+    <div class="col-lg-1"><button class="btn btn-primary w-100">Simpan</button></div>
+  </form>
+</section>
+
+<section class="panel-card panel-elevated">
+  <h5>Daftar Jurnal</h5>
+  <div class="table-responsive mt-2">
+    <table class="table table-hover align-middle journal-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          {% if can_manage_journal %}<th>User</th>{% endif %}
+          <th>Kegiatan</th>
+          <th>Output</th>
+          <th>Komentar</th>
+          <th>Status</th>
+          {% if can_manage_journal %}<th>Aksi</th>{% endif %}
+          <th>Barcode Verifikasi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in journals %}
+        {% set status = (item.status or '')|lower %}
+        {% set signature = signature_links.get(item.id) %}
+        <tr>
+          <td>{{ item.id }}</td>
+          {% if can_manage_journal %}<td>{{ item.user.username if item.user else ('User ' ~ item.user_id) }}</td>{% endif %}
+          <td>{{ item.kegiatan }}</td>
+          <td>{{ item.output or '-' }}</td>
+          <td>
+            {% if can_manage_journal %}
+            <form method="post" action="/journal/{{ item.id }}/comment" class="d-flex gap-1">
+              <input class="form-control form-control-sm" name="komentar" value="{{ item.komentar or '' }}" placeholder="Tulis komentar…" style="min-width:130px">
+              <button class="btn btn-sm btn-outline-secondary" type="submit">Simpan</button>
+            </form>
+            {% else %}
+            <span class="text-muted small">{{ item.komentar or '-' }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge text-bg-light border text-capitalize journal-status {% if status in ['approved', 'disetujui', 'valid'] %}status-pill-high{% elif status in ['pending', 'draft', 'menunggu'] %}status-pill-mid{% elif status in ['rejected', 'ditolak', 'invalid'] %}status-pill-low{% else %}status-pill-neutral{% endif %}">
+              {{ item.status }}
+            </span>
+          </td>
+          {% if can_manage_journal %}
+          <td>
+            {% if item.signature_token %}
+            <span class="badge text-bg-success">Sudah Signed</span>
+            {% else %}
+            <form method="post" action="/journal/{{ item.id }}/sign" class="d-inline">
+              <button class="btn btn-sm btn-outline-primary">Teken Pembimbing</button>
+            </form>
+            {% endif %}
+          </td>
+          {% endif %}
+          <td>
+            {% if signature %}
+            <div class="d-flex flex-column gap-2 align-items-start">
+              <img src="{{ signature.qr_url }}" alt="QR verifikasi jurnal {{ item.id }}" width="92" height="92" loading="lazy" class="rounded border">
+              <a href="{{ signature.verify_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">Buka Identitas</a>
+            </div>
+            {% else %}
+            <span class="text-muted small">Belum tersedia</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="{{ 8 if can_manage_journal else 6 }}" class="text-center text-muted">Belum ada jurnal kegiatan.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pagination(current_page, total_pages, base_url) }}
+</section>
+{% endblock %}

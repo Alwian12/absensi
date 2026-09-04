@@ -1,76 +1,825 @@
-<!doctype html>
-<html lang="id">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Dashboard - Monitoring PKL</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  </head>
-  <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-      <div class="container">
-        <a class="navbar-brand" href="/dashboard">Monitoring PKL</a>
-        <div class="ms-auto">
-          <a class="btn btn-outline-light btn-sm" href="/participants">Peserta</a>
-          <a class="btn btn-outline-light btn-sm" href="/attendance">Absensi</a>
-          <a class="btn btn-outline-light btn-sm" href="/journal">Jurnal</a>
-        </div>
+{% extends "layout.html" %}
+
+{% block title %}Dashboard — Monitoring PKL{% endblock %}
+{% block page_title %}{{ dashboard_title }}{% endblock %}
+
+{% block content %}
+
+{# ── Role hero banner ────────────────────────────────── #}
+<section class="db-hero db-hero-{{ dashboard_role }} motion-target mb-4">
+  <div class="db-hero-inner">
+    <div class="db-hero-text">
+      <span class="db-hero-eyebrow">{{ dashboard_role | upper }}</span>
+      <h2 class="db-hero-title">{{ dashboard_title }}</h2>
+      <p class="db-hero-sub">{{ dashboard_description }}</p>
+    </div>
+    <div class="db-hero-actions">
+      <button type="button" class="btn-focus-mode" id="dashboardFocusToggle">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+        Focus Mode
+      </button>
+    </div>
+  </div>
+  <div class="db-hero-blob" aria-hidden="true"></div>
+</section>
+
+{# ── Announcements banner ────────────────────────────── #}
+{% if announcements %}
+<section class="mb-4 focus-secondary">
+  {% for ann in announcements %}
+  <div class="ann-banner motion-target">
+    <svg class="ann-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 8a.76.76 0 0 0 0-1.5H8.82L5.34 3.05A1.5 1.5 0 0 0 3 4.31V19.5a1.5 1.5 0 0 0 2.34 1.24l3.48-3.45H22a.76.76 0 0 0 0-1.5V8z"/></svg>
+    <div>
+      <strong>{{ ann.title }}</strong>
+      <span class="ann-sep">—</span>
+      <span>{{ ann.content[:120] }}{% if ann.content|length > 120 %}…{% endif %}</span>
+    </div>
+    <span class="ann-date">{{ ann.created_at.strftime('%d %b') if ann.created_at else '' }}</span>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+{# ── Metric cards ────────────────────────────────────── #}
+{% set metric_icons = [
+  "hash","users","user-check","building-2","calendar-check","notebook-pen",
+  "star","bar-chart-2","clock","check-circle","alert-circle","trending-up"
+] %}
+<section class="db-metrics-grid mb-4">
+  {% for item in metrics %}
+  <div class="db-metric motion-target">
+    <div class="db-metric-icon db-metric-icon-{{ loop.index0 % 6 }}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        {% if loop.index0 == 0 %}<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        {% elif loop.index0 == 1 %}<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+        {% elif loop.index0 == 2 %}<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.07 10.83 19.79 19.79 0 0 1 1 2.18 2 2 0 0 1 2.96 0h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9a16 16 0 0 0 6.91 6.91l1.39-1.39a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 24 17z"/>
+        {% elif loop.index0 == 3 %}<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+        {% elif loop.index0 == 4 %}<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/>
+        {% else %}<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>{% endif %}
+      </svg>
+    </div>
+    <div class="db-metric-body">
+      <span class="db-metric-label">{{ item.label }}</span>
+      <span class="db-metric-value">{{ item.value }}</span>
+      <span class="db-metric-hint">{{ item.hint }}</span>
+    </div>
+  </div>
+  {% endfor %}
+</section>
+
+{% if dashboard_role == 'admin' and attendance_settings %}
+<section class="panel-card panel-elevated motion-target focus-secondary mb-4">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+    <div>
+      <h5 class="mb-1">Pengaturan Jam Absensi</h5>
+      <p class="text-muted small mb-0">Atur jam absensi dan UX verifikasi wajah. Pengaturan geofence GPS kini ada di halaman <a href="/institutions">Instansi</a>.</p>
+    </div>
+  </div>
+  <form method="post" action="/admin/attendance-settings" class="row g-2 align-items-end">
+    <div class="col-sm-6 col-lg-4">
+      <label for="jamMasukInput" class="form-label small text-uppercase fw-semibold">Jam Masuk</label>
+      <input type="time" class="form-control" id="jamMasukInput" name="jam_masuk" value="{{ attendance_settings.jam_masuk }}" required>
+    </div>
+    <div class="col-sm-6 col-lg-4">
+      <label for="jamPulangInput" class="form-label small text-uppercase fw-semibold">Jam Pulang</label>
+      <input type="time" class="form-control" id="jamPulangInput" name="jam_pulang" value="{{ attendance_settings.jam_pulang }}" required>
+    </div>
+    <div class="col-sm-6 col-lg-2">
+      <label for="successAutoHideInput" class="form-label small text-uppercase fw-semibold">Auto-hide (detik)</label>
+      <input type="number" min="3" max="20" class="form-control" id="successAutoHideInput" name="success_auto_hide_seconds" value="{{ attendance_settings.success_auto_hide_seconds }}" required>
+    </div>
+    <div class="col-sm-6 col-lg-2">
+      <label for="transitionStyleInput" class="form-label small text-uppercase fw-semibold">Mode Transisi</label>
+      <select class="form-select" id="transitionStyleInput" name="transition_style" required>
+        <option value="fast" {% if attendance_settings.transition_style == 'fast' %}selected{% endif %}>Fast</option>
+        <option value="normal" {% if attendance_settings.transition_style == 'normal' %}selected{% endif %}>Normal</option>
+        <option value="slow" {% if attendance_settings.transition_style == 'slow' %}selected{% endif %}>Slow</option>
+      </select>
+    </div>
+    <div class="col-lg-12 d-grid d-lg-flex justify-content-lg-end">
+      <button type="submit" class="btn btn-primary">Simpan Pengaturan</button>
+    </div>
+  </form>
+
+  <div class="db-ux-preview mt-3" id="attendanceUxPreview">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      <span class="db-ux-preview-title">Preview UX Absensi</span>
+      <span class="db-ux-badge" id="uxPreviewModeBadge">Mode: Normal</span>
+      <span class="db-ux-badge" id="uxPreviewHideBadge">Auto-hide: 9 detik</span>
+    </div>
+    <p class="db-ux-copy mb-2" id="uxPreviewCopy">Check-in terasa cepat, check-out terasa lebih ceremonial, dan ringkasan akhir menutup otomatis setelah 9 detik.</p>
+    <div class="db-ux-timing" id="uxPreviewTiming">Estimasi transisi: Check-in 1.3s • Check-out 1.9s • Registrasi 1.6s</div>
+    <div class="d-flex flex-wrap gap-2 mt-2">
+      <button type="button" class="btn btn-sm btn-outline-primary" id="uxPreviewSimulateBtn">Coba Simulasi</button>
+      <span class="db-ux-note">Simulasi memakai mode dan timing yang sedang dipilih.</span>
+    </div>
+    <div class="db-ux-sim d-none mt-2" id="uxPreviewSimulator" aria-live="polite">
+      <div class="db-ux-sim-loader" id="uxSimLoader"></div>
+      <div class="db-ux-sim-check d-none" id="uxSimCheck">✓</div>
+      <p class="db-ux-sim-title mb-0" id="uxSimTitle">Memproses verifikasi absensi...</p>
+      <p class="db-ux-sim-sub mb-0" id="uxSimSub">Sistem sedang menyimpan hasil absensi.</p>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ── PKL Progress (peserta only) ─────────────────────── #}
+{% if pkl_progress %}
+<section class="db-pkl-banner motion-target mb-4 {% if pkl_progress.hampir_selesai %}db-pkl-urgent{% endif %}">
+  <div class="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-2">
+    <div>
+      <p class="db-pkl-label">Progress PKL Saya</p>
+      <p class="db-pkl-dates">{{ pkl_progress.mulai }} → {{ pkl_progress.selesai }}</p>
+    </div>
+    <span class="db-pkl-badge {% if pkl_progress.hampir_selesai %}db-pkl-badge-urgent{% endif %}">
+      {% if pkl_progress.sisa < 0 %}Selesai
+      {% elif pkl_progress.hampir_selesai %}⚠ Sisa {{ pkl_progress.sisa }} hari
+      {% else %}Sisa {{ pkl_progress.sisa }} hari
+      {% endif %}
+    </span>
+  </div>
+  <div class="db-pkl-bar-wrap">
+    <div class="db-pkl-bar-fill {% if pkl_progress.hampir_selesai %}urgent{% endif %}" id="pklProgressFill" data-pct="{{ pkl_progress.pct }}"></div>
+  </div>
+  <div class="d-flex justify-content-between mt-1">
+    <small>{{ pkl_progress.pct }}% selesai</small>
+    <small>{{ 100 - pkl_progress.pct }}% tersisa</small>
+  </div>
+</section>
+{% endif %}
+
+{# ── Chart + recent activity ─────────────────────────── #}
+<section class="row g-3 mb-3">
+  <div class="col-lg-7">
+    <div class="panel-card panel-elevated h-100 dashboard-insight-card motion-target">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">{{ chart_title }}</h5>
+        <span class="db-chart-tag">30 hari</span>
       </div>
-    </nav>
-    <div class="container py-4">
-      <h2 class="mb-4">Dashboard</h2>
-      <div class="row g-3">
-        <div class="col-md-4">
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <h6 class="text-muted">Total User</h6>
-              <h3>{{ total_users }}</h3>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <h6 class="text-muted">Total Peserta</h6>
-              <h3>{{ total_participants }}</h3>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <h6 class="text-muted">Total Absensi</h6>
-              <h3>{{ total_attendance }}</h3>
-            </div>
-          </div>
-        </div>
+      <canvas id="attendanceChart" height="160" data-labels='{{ chart_labels | tojson }}' data-values='{{ chart_values | tojson }}'></canvas>
+    </div>
+  </div>
+  <div class="col-lg-5 d-flex flex-column gap-3">
+    <div class="panel-card panel-elevated dashboard-list-card motion-target focus-secondary">
+      <h5 class="mb-2">
+        {% if dashboard_role == 'peserta' %}Absensi Saya{% else %}Absensi Terbaru{% endif %}
+      </h5>
+      {% if dashboard_role == 'admin' %}
+      <div class="d-flex flex-wrap gap-1 mb-2">
+        <a href="/dashboard?review_filter=all" class="btn btn-sm {% if review_filter == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">Semua</a>
+        <a href="/dashboard?review_filter=pending" class="btn btn-sm {% if review_filter == 'pending' %}btn-warning{% else %}btn-outline-warning{% endif %}">Pending</a>
+        <a href="/dashboard?review_filter=approved" class="btn btn-sm {% if review_filter == 'approved' %}btn-success{% else %}btn-outline-success{% endif %}">Approved</a>
+        <a href="/dashboard?review_filter=rejected" class="btn btn-sm {% if review_filter == 'rejected' %}btn-danger{% else %}btn-outline-danger{% endif %}">Rejected</a>
+        <a href="/dashboard?review_filter=grace" class="btn btn-sm {% if review_filter == 'grace' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">Grace</a>
+        <a href="/dashboard?review_filter=risk" class="btn btn-sm {% if review_filter == 'risk' %}btn-dark{% else %}btn-outline-dark{% endif %}">Anomali</a>
       </div>
-      <div class="row mt-4 g-3">
-        <div class="col-md-6">
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <h5>Absensi Terbaru</h5>
-              <ul class="list-group list-group-flush">
-                {% for item in recent_attendance %}
-                <li class="list-group-item">ID {{ item.id }} - User {{ item.user_id }} - Status {{ item.status }}</li>
-                {% endfor %}
-              </ul>
-            </div>
-          </div>
+      {% endif %}
+      <div class="db-activity-list">
+        {% for item in recent_attendance %}
+        <div class="db-activity-row">
+          <div class="db-activity-dot db-dot-{% if item.status == 'hadir' %}green{% elif item.status == 'terlambat' %}amber{% elif item.status == 'izin' %}blue{% else %}gray{% endif %}"></div>
+          <span class="db-activity-name">
+            {% if dashboard_role == 'peserta' %}{{ item.attendance_date.strftime('%d %b') if item.attendance_date else '-' }}
+            {% else %}{{ item.user.username if item.user else ('User ' ~ item.user_id) }}{% endif %}
+          </span>
+          {% if dashboard_role == 'admin' and item.requires_location_review %}
+          {% set review_status = item.location_review_status or 'pending' %}
+          {% set review_reason = item.location_review_reason or 'unknown' %}
+          <span class="db-activity-status {% if review_status == 'approved' %}db-status-green{% elif review_status == 'rejected' %}db-status-gray{% else %}db-status-amber{% endif %}">review {{ review_status }}</span>
+          <span class="db-activity-status {% if review_reason == 'risk' %}db-status-gray{% elif review_reason == 'grace_and_risk' %}db-status-blue{% else %}db-status-amber{% endif %}">{{ review_reason }}</span>
+          {% endif %}
+          <span class="db-activity-status db-status-{% if item.status == 'hadir' %}green{% elif item.status == 'terlambat' %}amber{% elif item.status == 'izin' %}blue{% else %}gray{% endif %}">{{ item.status }}</span>
         </div>
-        <div class="col-md-6">
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <h5>Jurnal Terbaru</h5>
-              <ul class="list-group list-group-flush">
-                {% for item in recent_journal %}
-                <li class="list-group-item">{{ item.kegiatan }}</li>
-                {% endfor %}
-              </ul>
-            </div>
-          </div>
+        {% else %}
+        <p class="text-muted small mb-0 py-2">Belum ada data absensi.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% if dashboard_role == 'admin' %}
+{% set geo = namespace(items=[]) %}
+{% for item in recent_attendance %}
+  {% if item.latitude is not none and item.longitude is not none %}
+    {% set _ = geo.items.append(item) %}
+  {% endif %}
+{% endfor %}
+{% if review_sla %}
+<section class="panel-card panel-elevated motion-target focus-secondary mb-3">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h5 class="mb-0">SLA Review Lokasi Pending</h5>
+    <a class="db-chart-tag text-decoration-none" href="/location-reviews?review_filter=pending">Detail</a>
+  </div>
+  <div class="row g-2">
+    <div class="col-md-3">
+      <div class="db-metric">
+        <div class="db-metric-body">
+          <span class="db-metric-label">Total Pending</span>
+          <span class="db-metric-value">{{ review_sla.total }}</span>
         </div>
       </div>
     </div>
-  </body>
-</html>
+    <div class="col-md-3">
+      <div class="db-metric">
+        <div class="db-metric-body">
+          <span class="db-metric-label">&lt; 24 Jam</span>
+          <span class="db-metric-value">{{ review_sla.lt24 }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="db-metric">
+        <div class="db-metric-body">
+          <span class="db-metric-label">24 - 72 Jam</span>
+          <span class="db-metric-value">{{ review_sla.bt24_72 }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="db-metric">
+        <div class="db-metric-body">
+          <span class="db-metric-label">&gt; 72 Jam</span>
+          <span class="db-metric-value">{{ review_sla.gt72 }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+<section class="panel-card panel-elevated motion-target focus-secondary mb-3">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h5 class="mb-0">Peta Riwayat Titik Absensi</h5>
+    <span class="db-chart-tag">{{ geo.items | length }} titik</span>
+  </div>
+  {% if geo.items %}
+  <div class="row g-2 align-items-end">
+    <div class="col-lg-9">
+      <label for="adminGeoHistorySelect" class="form-label small text-uppercase fw-semibold">Pilih absensi</label>
+      <select class="form-select" id="adminGeoHistorySelect">
+        {% for item in geo.items %}
+        <option value="{{ item.latitude }},{{ item.longitude }}" data-lat="{{ item.latitude }}" data-lng="{{ item.longitude }}">
+          {{ item.user.username if item.user else ('User ' ~ item.user_id) }} • {{ item.attendance_date.strftime('%d/%m/%Y %H:%M') if item.attendance_date else '-' }} • {{ (item.distance_from_office_m or 0) | round(1) }}m
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-lg-3 d-grid">
+      <a href="#" id="adminGeoOpenMapsBtn" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary">Buka di Google Maps</a>
+    </div>
+    <div class="col-12">
+      <iframe id="adminGeoMapFrame" class="w-100 rounded border" height="260" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+    </div>
+  </div>
+  {% else %}
+  <p class="text-muted small mb-0">Belum ada data absensi dengan koordinat GPS.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{# ── Journal + quick actions ─────────────────────────── #}
+<section class="row g-3 mb-3">
+  <div class="col-lg-7">
+    <div class="panel-card panel-elevated h-100 motion-target focus-secondary">
+      <h5 class="mb-3">{% if dashboard_role == 'peserta' %}Jurnal Saya{% else %}Jurnal Terbaru{% endif %}</h5>
+      <div class="db-journal-list">
+        {% for item in recent_journal %}
+        <div class="db-journal-row">
+          <div class="db-journal-dot"></div>
+          <div class="db-journal-content">
+            <p class="db-journal-title">{{ item.kegiatan[:80] }}{% if item.kegiatan|length > 80 %}…{% endif %}</p>
+            {% if dashboard_role != 'peserta' %}<small class="text-muted">{{ item.user.username if item.user else ('User ' ~ item.user_id) }}</small>{% endif %}
+          </div>
+          <span class="db-journal-badge db-jbadge-{% if item.status in ['approved','disetujui','valid'] %}green{% elif item.status in ['pending','menunggu','draft'] %}amber{% elif item.status in ['rejected','ditolak'] %}red{% else %}gray{% endif %}">{{ item.status }}</span>
+        </div>
+        {% else %}
+        <p class="text-muted small mb-0 py-2">Belum ada jurnal.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="panel-card panel-elevated h-100 motion-target">
+      <h5 class="mb-3">Aksi Cepat</h5>
+      <div class="db-quick-grid">
+        {% for action in quick_links %}
+        <a href="{{ action.href }}" class="db-quick-item">
+          <span class="db-quick-label">{{ action.label }}</span>
+          <span class="db-quick-hint">{{ action.hint }}</span>
+        </a>
+        {% else %}
+        <p class="text-muted small">Tidak ada aksi cepat.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ── Trend line chart ─────────────────────────────── #}
+<section class="panel-card mb-3 motion-target focus-secondary">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0">Tren Absensi 7 Hari</h5>
+    <a href="/api/reports/analytics/trend?days=30" class="db-chart-tag text-decoration-none">JSON API</a>
+  </div>
+  <canvas id="trendChart" height="120"></canvas>
+</section>
+
+{# ── Pembimbing: peserta belum absen ─────────────────── #}
+{% if pembimbing_extra and pembimbing_extra.belum_absen %}
+<section class="panel-card motion-target focus-secondary mb-3">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h5 class="mb-0">Peserta Belum Absen Hari Ini</h5>
+    <span class="db-alert-count">{{ pembimbing_extra.belum_absen | length }} orang</span>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    {% for u in pembimbing_extra.belum_absen %}
+    <a href="/attendance" class="db-absent-chip">{{ u.username }}</a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/vendor/chart.umd.min.js"></script>
+<style>
+  /* ── Dashboard role heroes ── */
+  .db-hero { border-radius: 18px; padding: 2rem 2rem 1.75rem; position: relative; overflow: hidden; }
+  .db-hero-admin      { background: linear-gradient(135deg, #312e81 0%, #4338ca 55%, #6366f1 100%); color: #fff; }
+  .db-hero-pembimbing { background: linear-gradient(135deg, #065f46 0%, #059669 55%, #10b981 100%); color: #fff; }
+  .db-hero-peserta    { background: linear-gradient(135deg, #92400e 0%, #d97706 55%, #f59e0b 100%); color: #fff; }
+
+  .db-hero-inner { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; }
+  .db-hero-eyebrow { font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; opacity: .75; display: block; margin-bottom: .3rem; }
+  .db-hero-title { font-size: 1.6rem; font-weight: 800; margin: 0 0 .4rem; letter-spacing: -.03em; }
+  .db-hero-sub { font-size: .875rem; opacity: .8; margin: 0; max-width: 460px; line-height: 1.55; }
+
+  .btn-focus-mode {
+    display: inline-flex; align-items: center; gap: .4rem;
+    background: rgba(255,255,255,.15); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.25);
+    color: #fff; font-size: .8rem; font-weight: 600;
+    padding: .45rem .9rem; border-radius: 8px; cursor: pointer;
+    transition: background .15s; white-space: nowrap;
+  }
+  .btn-focus-mode:hover { background: rgba(255,255,255,.25); }
+  .app-main.dashboard-focus-on .btn-focus-mode { background: rgba(255,255,255,.35); }
+
+  .db-hero-blob {
+    position: absolute; right: -60px; top: -60px;
+    width: 260px; height: 260px; border-radius: 50%;
+    background: rgba(255,255,255,.07); pointer-events: none; z-index: 1;
+  }
+
+  /* ── Metrics grid ── */
+  .db-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: .875rem;
+  }
+  .db-metric {
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1rem;
+    display: flex;
+    align-items: flex-start;
+    gap: .875rem;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow .2s, transform .2s;
+  }
+  .db-metric:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+
+  .db-metric-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .db-metric-icon-0 { background: #eef2ff; color: #6366f1; }
+  .db-metric-icon-1 { background: #ecfdf5; color: #10b981; }
+  .db-metric-icon-2 { background: #fffbeb; color: #d97706; }
+  .db-metric-icon-3 { background: #fdf4ff; color: #a855f7; }
+  .db-metric-icon-4 { background: #eff6ff; color: #3b82f6; }
+  .db-metric-icon-5 { background: #fff1f2; color: #f43f5e; }
+  :root[data-theme="slate"] .db-metric-icon-0 { background: rgba(99,102,241,.15); }
+  :root[data-theme="slate"] .db-metric-icon-1 { background: rgba(16,185,129,.15); }
+  :root[data-theme="slate"] .db-metric-icon-2 { background: rgba(217,119,6,.15); }
+  :root[data-theme="slate"] .db-metric-icon-3 { background: rgba(168,85,247,.15); }
+  :root[data-theme="slate"] .db-metric-icon-4 { background: rgba(59,130,246,.15); }
+  :root[data-theme="slate"] .db-metric-icon-5 { background: rgba(244,63,94,.15); }
+
+  .db-metric-body { display: flex; flex-direction: column; min-width: 0; }
+  .db-metric-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-soft); }
+  .db-metric-value { font-size: 1.7rem; font-weight: 800; color: var(--text-main); line-height: 1.1; margin: .2rem 0 .15rem; }
+  .db-metric-hint  { font-size: .72rem; color: var(--text-muted); }
+
+  /* ── PKL progress banner ── */
+  .db-pkl-banner {
+    background: linear-gradient(135deg, #fffbeb, #fef3c7);
+    border: 1px solid #fde68a;
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    color: #92400e;
+  }
+  .db-pkl-banner.db-pkl-urgent {
+    background: linear-gradient(135deg, #fff1f2, #fecdd3);
+    border-color: #fda4af;
+    color: #9f1239;
+  }
+  :root[data-theme="slate"] .db-pkl-banner { background: rgba(217,119,6,.12); border-color: rgba(217,119,6,.3); color: #fbbf24; }
+  :root[data-theme="slate"] .db-pkl-banner.db-pkl-urgent { background: rgba(244,63,94,.12); border-color: rgba(244,63,94,.3); color: #fda4af; }
+
+  .db-pkl-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; opacity: .75; margin-bottom: .1rem; }
+  .db-pkl-dates { font-size: .82rem; font-weight: 600; }
+  .db-pkl-badge {
+    background: rgba(217,119,6,.12); border: 1px solid rgba(217,119,6,.3);
+    color: #92400e; font-size: .76rem; font-weight: 700;
+    padding: .22rem .65rem; border-radius: 999px; white-space: nowrap;
+  }
+  .db-pkl-badge.db-pkl-badge-urgent { background: rgba(244,63,94,.12); border-color: rgba(244,63,94,.3); color: #9f1239; }
+  :root[data-theme="slate"] .db-pkl-badge { color: #fbbf24; }
+
+  .db-pkl-bar-wrap { height: 10px; background: rgba(0,0,0,.08); border-radius: 99px; overflow: hidden; }
+  .db-pkl-bar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #f59e0b, #d97706); transition: width .6s cubic-bezier(.4,0,.2,1); }
+  .db-pkl-bar-fill.urgent { background: linear-gradient(90deg, #f43f5e, #e11d48); }
+
+  /* ── Activity list ── */
+  .db-activity-list { display: flex; flex-direction: column; gap: .4rem; }
+  .db-activity-row { display: flex; align-items: center; gap: .65rem; padding: .45rem .3rem; border-radius: 8px; transition: background .12s; }
+  .db-activity-row:hover { background: var(--accent-glow); }
+  .db-activity-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .db-dot-green { background: #10b981; } .db-dot-amber { background: #f59e0b; } .db-dot-blue { background: #3b82f6; } .db-dot-gray { background: #94a3b8; }
+  .db-activity-name { flex: 1; font-size: .84rem; font-weight: 500; color: var(--text-main); }
+  .db-activity-status { font-size: .74rem; font-weight: 700; border-radius: 999px; padding: .12rem .5rem; }
+  .db-status-green { background: #ecfdf5; color: #065f46; } .db-status-amber { background: #fffbeb; color: #92400e; } .db-status-blue { background: #eff6ff; color: #1e40af; } .db-status-gray { background: #f8fafc; color: #475569; }
+  :root[data-theme="slate"] .db-status-green { background: rgba(16,185,129,.15); color: #6ee7b7; }
+  :root[data-theme="slate"] .db-status-amber { background: rgba(245,158,11,.15); color: #fcd34d; }
+  :root[data-theme="slate"] .db-status-blue  { background: rgba(59,130,246,.15);  color: #93c5fd; }
+  :root[data-theme="slate"] .db-status-gray  { background: rgba(255,255,255,.06); color: #94a3b8; }
+
+  /* ── Journal list ── */
+  .db-journal-list { display: flex; flex-direction: column; gap: .35rem; }
+  .db-journal-row { display: flex; align-items: flex-start; gap: .65rem; padding: .55rem .3rem; border-radius: 8px; transition: background .12s; }
+  .db-journal-row:hover { background: var(--accent-glow); }
+  .db-journal-dot { width: 7px; height: 7px; border-radius: 50%; background: #6366f1; flex-shrink: 0; margin-top: .45rem; }
+  .db-journal-content { flex: 1; min-width: 0; }
+  .db-journal-title { font-size: .84rem; font-weight: 500; color: var(--text-main); margin: 0; line-height: 1.4; }
+  .db-journal-badge { font-size: .7rem; font-weight: 700; border-radius: 999px; padding: .12rem .5rem; white-space: nowrap; }
+  .db-jbadge-green { background: #ecfdf5; color: #065f46; } .db-jbadge-amber { background: #fffbeb; color: #92400e; } .db-jbadge-red { background: #fff1f2; color: #9f1239; } .db-jbadge-gray { background: #f8fafc; color: #475569; }
+  :root[data-theme="slate"] .db-jbadge-green { background: rgba(16,185,129,.15); color: #6ee7b7; }
+  :root[data-theme="slate"] .db-jbadge-amber { background: rgba(245,158,11,.15); color: #fcd34d; }
+  :root[data-theme="slate"] .db-jbadge-red   { background: rgba(244,63,94,.15);  color: #fda4af; }
+  :root[data-theme="slate"] .db-jbadge-gray  { background: rgba(255,255,255,.06); color: #94a3b8; }
+
+  /* ── Quick actions grid ── */
+  .db-quick-grid { display: grid; gap: .65rem; }
+  .db-quick-item {
+    display: flex; flex-direction: column;
+    background: var(--page-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: .8rem 1rem;
+    text-decoration: none;
+    transition: all .15s;
+  }
+  .db-quick-item:hover { border-color: var(--accent); background: var(--accent-light); transform: translateX(3px); }
+  .db-quick-label { font-size: .855rem; font-weight: 700; color: var(--text-main); }
+  .db-quick-hint  { font-size: .75rem; color: var(--text-soft); margin-top: .15rem; }
+  :root[data-theme="slate"] .db-quick-item { background: rgba(255,255,255,.03); }
+
+  /* ── Chart tag ── */
+  .db-chart-tag { font-size: .72rem; font-weight: 600; background: var(--page-bg); border: 1px solid var(--border); color: var(--text-soft); border-radius: 999px; padding: .18rem .6rem; }
+
+  .db-ux-preview {
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    padding: .85rem .95rem;
+    background: color-mix(in srgb, var(--panel-bg) 84%, #fef3c7 16%);
+  }
+  .db-ux-preview-title {
+    font-size: .76rem;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+  }
+  .db-ux-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: .18rem .58rem;
+    border: 1px solid rgba(245,158,11,.35);
+    background: rgba(245,158,11,.12);
+    color: #92400e;
+    font-size: .72rem;
+    font-weight: 700;
+  }
+  .db-ux-copy {
+    font-size: .82rem;
+    color: var(--text-main);
+  }
+  .db-ux-timing {
+    font-size: .76rem;
+    color: var(--text-soft);
+    font-weight: 600;
+  }
+  .db-ux-note {
+    font-size: .72rem;
+    color: var(--text-soft);
+    align-self: center;
+  }
+  .db-ux-sim {
+    border: 1px solid rgba(99,102,241,.25);
+    border-radius: 12px;
+    background: rgba(99,102,241,.08);
+    padding: .8rem;
+    text-align: center;
+  }
+  .db-ux-sim-loader {
+    width: 30px;
+    height: 30px;
+    border: 3px solid rgba(99,102,241,.2);
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    margin: 0 auto .45rem;
+    animation: dbUxSpin 1s linear infinite;
+  }
+  .db-ux-sim-check {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #16a34a;
+    color: #fff;
+    font-weight: 800;
+    margin: 0 auto .45rem;
+    animation: dbUxPop .35s ease;
+  }
+  .db-ux-sim-title {
+    font-size: .8rem;
+    font-weight: 800;
+    color: var(--text-main);
+  }
+  .db-ux-sim-sub {
+    font-size: .74rem;
+    color: var(--text-soft);
+  }
+  :root[data-theme="slate"] .db-ux-preview {
+    background: rgba(245,158,11,.1);
+    border-color: rgba(245,158,11,.3);
+  }
+  :root[data-theme="slate"] .db-ux-badge {
+    background: rgba(245,158,11,.14);
+    border-color: rgba(245,158,11,.34);
+    color: #fcd34d;
+  }
+  :root[data-theme="slate"] .db-ux-sim {
+    border-color: rgba(129,140,248,.32);
+    background: rgba(129,140,248,.13);
+  }
+
+  @keyframes dbUxSpin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes dbUxPop {
+    from { transform: scale(.65); opacity: .1; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  /* ── Announcement banner ── */
+  .ann-banner {
+    display: flex; align-items: flex-start; gap: .75rem;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-left: 4px solid #3b82f6;
+    border-radius: 10px;
+    padding: .75rem 1rem;
+    font-size: .855rem;
+    color: #1e3a5f;
+    margin-bottom: .5rem;
+  }
+  :root[data-theme="slate"] .ann-banner { background: rgba(59,130,246,.12); border-color: rgba(59,130,246,.3); color: #93c5fd; }
+  .ann-icon { flex-shrink: 0; stroke: #3b82f6; margin-top: 1px; }
+  .ann-sep  { opacity: .4; margin: 0 .2rem; }
+  .ann-date { margin-left: auto; font-size: .75rem; white-space: nowrap; opacity: .65; }
+
+  /* ── Pembimbing absent alert ── */
+  .db-alert-count { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; font-size: .74rem; font-weight: 700; border-radius: 999px; padding: .18rem .65rem; }
+  .db-absent-chip { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 8px; padding: .3rem .7rem; font-size: .8rem; font-weight: 600; text-decoration: none; transition: all .15s; }
+  .db-absent-chip:hover { background: #fef3c7; border-color: #f59e0b; color: #78350f; }
+  :root[data-theme="slate"] .db-absent-chip { background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.3); color: #fcd34d; }
+</style>
+<script>
+  var pklFill = document.getElementById("pklProgressFill");
+  if (pklFill) pklFill.style.width = (pklFill.dataset.pct || "0") + "%";
+
+  var ctx = document.getElementById("attendanceChart");
+  if (ctx) {
+    var labels = JSON.parse(ctx.dataset.labels || "[]");
+    var values = JSON.parse(ctx.dataset.values || "[]");
+    var dark = document.documentElement.getAttribute("data-theme") === "slate";
+    var cctx = ctx.getContext("2d");
+    var grad = cctx.createLinearGradient(0, 0, 0, 200);
+    grad.addColorStop(0, dark ? "rgba(129,140,248,.9)" : "rgba(99,102,241,.85)");
+    grad.addColorStop(1, dark ? "rgba(99,102,241,.35)" : "rgba(99,102,241,.25)");
+    new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{ data: values, backgroundColor: grad, borderRadius: 8, borderSkipped: false, borderColor: "transparent", borderWidth: 0 }]
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: dark ? "#1e293b" : "#0f172a",
+            titleColor: "#f8fafc", bodyColor: "#94a3b8",
+            cornerRadius: 8, padding: 10, displayColors: false,
+            callbacks: { title: function(i){ return i[0].label; }, label: function(i){ return i.raw + " absensi"; } }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: dark ? "#64748b" : "#94a3b8", font: { size: 11 } } },
+          y: { beginAtZero: true, ticks: { precision: 0, color: dark ? "#64748b" : "#94a3b8", font: { size: 11 } }, grid: { color: dark ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.05)" } }
+        },
+        animation: { duration: 700, easing: "easeOutQuart" }
+      }
+    });
+  }
+
+  (function () {
+    var toggle = document.getElementById("dashboardFocusToggle");
+    var main = document.querySelector(".app-main");
+    if (!toggle || !main) return;
+    function applyFocus(on) {
+      main.classList.toggle("dashboard-focus-on", on);
+      toggle.innerHTML = on
+        ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg> Exit Focus'
+        : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg> Focus Mode';
+      try { localStorage.setItem("dashboardFocusMode", on ? "1" : "0"); } catch(e) {}
+    }
+    var init = false;
+    try { init = localStorage.getItem("dashboardFocusMode") === "1"; } catch(e) {}
+    applyFocus(init);
+    toggle.addEventListener("click", function() { applyFocus(!main.classList.contains("dashboard-focus-on")); });
+  })();
+
+  (function () {
+    var styleInput = document.getElementById("transitionStyleInput");
+    var hideInput = document.getElementById("successAutoHideInput");
+    var modeBadge = document.getElementById("uxPreviewModeBadge");
+    var hideBadge = document.getElementById("uxPreviewHideBadge");
+    var copyText = document.getElementById("uxPreviewCopy");
+    var timingText = document.getElementById("uxPreviewTiming");
+    var simulateBtn = document.getElementById("uxPreviewSimulateBtn");
+    var simulator = document.getElementById("uxPreviewSimulator");
+    var simLoader = document.getElementById("uxSimLoader");
+    var simCheck = document.getElementById("uxSimCheck");
+    var simTitle = document.getElementById("uxSimTitle");
+    var simSub = document.getElementById("uxSimSub");
+    if (!styleInput || !hideInput || !modeBadge || !hideBadge || !copyText || !timingText) return;
+
+    var scales = { fast: 0.85, normal: 1, slow: 1.22 };
+    var base = {
+      register: { p: 700, r: 850 },
+      checkin: { p: 520, r: 760 },
+      checkout: { p: 860, r: 1080 }
+    };
+
+    function sleep(ms) {
+      return new Promise(function(resolve) { setTimeout(resolve, ms); });
+    }
+
+    function getStyleAndScale() {
+      var style = (styleInput.value || "normal").toLowerCase();
+      if (!scales[style]) style = "normal";
+      return { style: style, scale: scales[style] };
+    }
+
+    function totalMs(entry, scale) {
+      return Math.round((entry.p + entry.r) * scale);
+    }
+
+    function prettySeconds(ms) {
+      return (ms / 1000).toFixed(1) + "s";
+    }
+
+    function updatePreview() {
+      var styleState = getStyleAndScale();
+      var style = styleState.style;
+      var scale = styleState.scale;
+
+      var sec = parseInt(hideInput.value || "9", 10);
+      if (!Number.isFinite(sec)) sec = 9;
+      sec = Math.max(3, Math.min(20, sec));
+
+      var titleCase = style.charAt(0).toUpperCase() + style.slice(1);
+      modeBadge.textContent = "Mode: " + titleCase;
+      hideBadge.textContent = "Auto-hide: " + sec + " detik";
+
+      var checkinText = prettySeconds(totalMs(base.checkin, scale));
+      var checkoutText = prettySeconds(totalMs(base.checkout, scale));
+      var registerText = prettySeconds(totalMs(base.register, scale));
+
+      timingText.textContent = "Estimasi transisi: Check-in " + checkinText + " • Check-out " + checkoutText + " • Registrasi " + registerText;
+
+      if (style === "fast") {
+        copyText.textContent = "Mode cepat cocok untuk operasional padat. Respons sukses terasa ringkas, lalu ringkasan akhir menutup otomatis setelah " + sec + " detik.";
+      } else if (style === "slow") {
+        copyText.textContent = "Mode lambat memberi nuansa ceremonial lebih kuat, terutama saat check-out. Ringkasan akhir menutup otomatis setelah " + sec + " detik.";
+      } else {
+        copyText.textContent = "Mode normal memberi keseimbangan antara kecepatan dan efek visual. Ringkasan akhir menutup otomatis setelah " + sec + " detik.";
+      }
+    }
+
+    styleInput.addEventListener("change", updatePreview);
+    hideInput.addEventListener("input", updatePreview);
+
+    if (simulateBtn && simulator && simLoader && simCheck && simTitle && simSub) {
+      simulateBtn.addEventListener("click", async function() {
+        var styleState = getStyleAndScale();
+        var scale = styleState.scale;
+
+        var processing = Math.round(base.checkin.p * scale);
+        var reveal = Math.round(base.checkin.r * scale);
+
+        simulateBtn.disabled = true;
+        simulator.classList.remove("d-none");
+        simLoader.classList.remove("d-none");
+        simCheck.classList.add("d-none");
+        simTitle.textContent = "Memproses check-in...";
+        simSub.textContent = "Sistem sedang memvalidasi dan menyimpan absensi masuk.";
+
+        await sleep(Math.max(180, processing));
+
+        simLoader.classList.add("d-none");
+        simCheck.classList.remove("d-none");
+        simTitle.textContent = "Check-in berhasil";
+        simSub.textContent = "Transisi selesai dalam kira-kira " + ((processing + reveal) / 1000).toFixed(1) + " detik.";
+
+        await sleep(Math.max(200, reveal));
+        simulator.classList.add("d-none");
+        simulateBtn.disabled = false;
+      });
+    }
+
+    updatePreview();
+  })();
+
+  // Load 7-day trend line chart
+  (function() {
+    var trendCanvas = document.getElementById("trendChart");
+    if (!trendCanvas) return;
+    fetch("/api/reports/analytics/trend?days=7")
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        var rows = data.data || [];
+        var dark = document.documentElement.getAttribute("data-theme") === "slate";
+        new Chart(trendCanvas, {
+          type: "line",
+          data: {
+            labels: rows.map(function(r){ return r.label; }),
+            datasets: [
+              { label: "Total", data: rows.map(function(r){ return r.total; }), borderColor: dark ? "#a5b4fc" : "#6366f1", tension: 0.4, fill: false, pointRadius: 4 },
+              { label: "Hadir", data: rows.map(function(r){ return r.hadir; }), borderColor: dark ? "#34d399" : "#10b981", tension: 0.4, fill: false, pointRadius: 4 }
+            ]
+          },
+          options: {
+            plugins: { legend: { labels: { color: dark ? "#94a3b8" : "#64748b", font: { size: 11 } } }, tooltip: { backgroundColor: dark ? "#1e293b" : "#0f172a", titleColor: "#f8fafc", bodyColor: "#94a3b8" } },
+            scales: {
+              x: { grid: { display: false }, ticks: { color: dark ? "#64748b" : "#94a3b8", font: { size: 11 } } },
+              y: { beginAtZero: true, ticks: { precision: 0, color: dark ? "#64748b" : "#94a3b8" }, grid: { color: dark ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.05)" } }
+            }
+          }
+        });
+      }).catch(function(){});
+  })();
+
+  (function () {
+    var select = document.getElementById("adminGeoHistorySelect");
+    var frame = document.getElementById("adminGeoMapFrame");
+    var openBtn = document.getElementById("adminGeoOpenMapsBtn");
+    if (!select || !frame || !openBtn) return;
+
+    function updateGeoPreview() {
+      var option = select.options[select.selectedIndex];
+      if (!option) return;
+      var lat = Number.parseFloat(option.getAttribute("data-lat"));
+      var lng = Number.parseFloat(option.getAttribute("data-lng"));
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+      var q = lat.toFixed(7) + "," + lng.toFixed(7);
+      frame.src = "https://www.google.com/maps?q=" + q + "&output=embed";
+      openBtn.href = "https://www.google.com/maps?q=" + q;
+    }
+
+    select.addEventListener("change", updateGeoPreview);
+    updateGeoPreview();
+  })();
+</script>
+{% endblock %}

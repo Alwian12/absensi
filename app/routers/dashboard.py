@@ -6,7 +6,7 @@ from app.models.attendance import Attendance
 from app.models.journal import Journal
 from app.models.user import User
 
-router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 
 def get_db() -> Session:

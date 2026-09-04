@@ -1,48 +1,123 @@
-<!doctype html>
-<html lang="id">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Penilaian - Monitoring PKL</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  </head>
-  <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-      <div class="container">
-        <a class="navbar-brand" href="/dashboard">Monitoring PKL</a>
-      </div>
-    </nav>
-    <div class="container py-4">
-      <h2 class="mb-4">Penilaian Peserta</h2>
-      <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body">
-          <h5>Tambah Nilai</h5>
-          <form method="post" class="row g-2">
-            <div class="col-md-3">
-              <select class="form-select" name="user_id">
-                {% for participant in participants %}
-                <option value="{{ participant.user_id }}">{{ participant.nama_lengkap }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="col-md-2"><input class="form-control" name="nilai" type="number" placeholder="Nilai" required></div>
-            <div class="col-md-5"><input class="form-control" name="catatan" placeholder="Catatan"></div>
-            <div class="col-md-2"><button class="btn btn-primary w-100">Simpan</button></div>
-          </form>
-        </div>
-      </div>
-      <div class="card shadow-sm border-0">
-        <div class="card-body">
-          <table class="table table-striped">
-            <thead><tr><th>#</th><th>User</th><th>Nilai</th><th>Catatan</th></tr></thead>
-            <tbody>
-              {% for assessment in assessments %}
-              <tr><td>{{ assessment.id }}</td><td>{{ assessment.user_id }}</td><td>{{ assessment.nilai }}</td><td>{{ assessment.catatan }}</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+{% extends "layout.html" %}
+
+{% block title %}Penilaian - Monitoring PKL{% endblock %}
+{% block page_title %}{{ assessments_page_title }}{% endblock %}
+
+{% block content %}
+{% set score = namespace(high=0, mid=0, low=0, total=0) %}
+{% for assessment in assessments %}
+  {% set nilai = assessment.nilai or 0 %}
+  {% set score.total = score.total + nilai %}
+  {% if nilai >= 85 %}
+    {% set score.high = score.high + 1 %}
+  {% elif nilai >= 70 %}
+    {% set score.mid = score.mid + 1 %}
+  {% else %}
+    {% set score.low = score.low + 1 %}
+  {% endif %}
+{% endfor %}
+{% set avg = (score.total / (assessments|length)) if (assessments|length) > 0 else 0 %}
+
+<section class="panel-card page-hero page-hero-assessment mb-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+    <div class="hero-title-wrap">
+      <span class="hero-glyph" aria-hidden="true">
+        <svg viewBox="0 0 24 24" role="img" focusable="false" aria-hidden="true">
+          <path d="M4 5h16"></path>
+          <path d="M4 11h12"></path>
+          <path d="M4 17h8"></path>
+          <path d="M14 16l2 2 4-4"></path>
+        </svg>
+      </span>
+      <div>
+      <h5 class="mb-0">{{ assessments_page_title }}</h5>
       </div>
     </div>
-  </body>
-</html>
+    <span class="summary-badge">{{ assessments|length }} penilaian</span>
+  </div>
+  <div class="row g-2 mt-2 mini-metric-row">
+    <div class="col-sm-4">
+      <div class="mini-metric mini-metric-high">
+        <span class="mini-metric-label">Skor Tinggi</span>
+        <strong class="mini-metric-value">{{ score.high }}</strong>
+      </div>
+    </div>
+    <div class="col-sm-4">
+      <div class="mini-metric mini-metric-mid">
+        <span class="mini-metric-label">Skor Menengah</span>
+        <strong class="mini-metric-value">{{ score.mid }}</strong>
+      </div>
+    </div>
+    <div class="col-sm-4">
+      <div class="mini-metric mini-metric-low">
+        <span class="mini-metric-label">Skor Rendah</span>
+        <strong class="mini-metric-value">{{ score.low }}</strong>
+      </div>
+    </div>
+    <div class="col-sm-12">
+      <div class="mini-metric mini-metric-neutral">
+        <span class="mini-metric-label">Rata-rata Nilai</span>
+        <strong class="mini-metric-value">{{ '%.1f'|format(avg) }}</strong>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% if can_manage_assessment %}
+<section class="panel-card mb-3 panel-elevated">
+  <h5>Tambah Nilai Baru</h5>
+  <p class="text-muted mb-2">Gunakan skala 0-100 dan tambahkan catatan singkat agar feedback lebih jelas untuk peserta.</p>
+  <form method="post" class="row g-2 mt-1">
+    <div class="col-lg-3">
+      <select class="form-select" name="user_id" required>
+        {% for participant in participants %}
+        <option value="{{ participant.user_id }}">{{ participant.nama_lengkap }}</option>
+        {% else %}
+        <option value="">Belum ada peserta</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-lg-2"><input class="form-control" name="nilai" type="number" min="0" max="100" placeholder="Nilai" required></div>
+    <div class="col-lg-5"><input class="form-control" name="catatan" placeholder="Catatan"></div>
+    <div class="col-lg-2"><button class="btn btn-primary w-100">Simpan</button></div>
+  </form>
+</section>
+{% endif %}
+
+<section class="panel-card panel-elevated">
+  <h5>Riwayat Penilaian</h5>
+  <p class="text-muted mb-2">Data terbaru ditampilkan di bagian atas tabel.</p>
+  <div class="table-responsive mt-2">
+    <table class="table table-hover align-middle assessment-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          {% if can_manage_assessment %}<th>User</th>{% endif %}
+          <th>Nilai</th>
+          <th>Catatan</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for assessment in assessments %}
+        {% set nilai = assessment.nilai or 0 %}
+        <tr>
+          <td>{{ assessment.id }}</td>
+          {% if can_manage_assessment %}<td>{{ assessment.user.username if assessment.user else ('User ' ~ assessment.user_id) }}</td>{% endif %}
+          <td>
+            <span class="score-pill {% if nilai >= 85 %}score-high{% elif nilai >= 70 %}score-mid{% else %}score-low{% endif %}">
+              {{ assessment.nilai }}
+            </span>
+            <span class="badge border ms-1 status-pill-neutral">
+              {% if nilai >= 85 %}Grade A{% elif nilai >= 70 %}Grade B{% else %}Grade C{% endif %}
+            </span>
+          </td>
+          <td>{{ assessment.catatan or '-' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="{{ 4 if can_manage_assessment else 3 }}" class="text-center text-muted">Belum ada data penilaian.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

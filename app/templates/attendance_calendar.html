@@ -1,0 +1,119 @@
+{% extends "layout.html" %}
+
+{% block title %}Kalender Absensi - Monitoring PKL{% endblock %}
+{% block page_title %}Kalender Absensi{% endblock %}
+
+{% block content %}
+<section class="panel-card page-hero mb-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+    <div>
+      <h5 class="mb-1">Kalender Absensi Bulanan</h5>
+      <p class="text-muted mb-0">
+        {% if can_manage_attendance %}
+        Lihat rekap kehadiran per peserta dalam tampilan kalender.
+        {% else %}
+        Lihat rekap kehadiran Anda dalam tampilan kalender.
+        {% endif %}
+      </p>
+    </div>
+    <a href="/attendance" class="btn btn-outline-secondary btn-sm">Kembali ke Tabel Absensi</a>
+  </div>
+</section>
+
+{% if can_manage_attendance %}
+<section class="panel-card mb-3">
+  <form method="get" action="/attendance/calendar" class="row g-2 align-items-end">
+    <input type="hidden" name="year" value="{{ year }}">
+    <input type="hidden" name="month" value="{{ month }}">
+    <div class="col-md-6 col-lg-4">
+      <label class="form-label small text-uppercase fw-semibold">Pilih Peserta</label>
+      <select class="form-select" name="user_id" onchange="this.form.submit()">
+        {% for u in users %}
+        <option value="{{ u.id }}" {% if u.id == target_user_id %}selected{% endif %}>{{ u.username }}</option>
+        {% else %}
+        <option value="">Belum ada peserta</option>
+        {% endfor %}
+      </select>
+    </div>
+  </form>
+</section>
+{% endif %}
+
+<section class="panel-card mb-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <a class="btn btn-outline-secondary btn-sm"
+       href="/attendance/calendar?year={{ prev_year }}&month={{ prev_month }}{% if can_manage_attendance and target_user_id %}&user_id={{ target_user_id }}{% endif %}">
+      &lsaquo; Bulan Sebelumnya
+    </a>
+    <h5 class="mb-0">{{ month_name }} {{ year }}{% if can_manage_attendance and target_user %} — {{ target_user.username }}{% endif %}</h5>
+    <a class="btn btn-outline-secondary btn-sm"
+       href="/attendance/calendar?year={{ next_year }}&month={{ next_month }}{% if can_manage_attendance and target_user_id %}&user_id={{ target_user_id }}{% endif %}">
+      Bulan Berikutnya &rsaquo;
+    </a>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-md-3">
+      <div class="mini-metric mini-metric-high">
+        <span class="mini-metric-label">Hadir</span>
+        <strong class="mini-metric-value">{{ status_counts.get('hadir', 0) }}</strong>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="mini-metric mini-metric-low">
+        <span class="mini-metric-label">Terlambat</span>
+        <strong class="mini-metric-value">{{ status_counts.get('terlambat', 0) }}</strong>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="mini-metric mini-metric-mid">
+        <span class="mini-metric-label">Izin</span>
+        <strong class="mini-metric-value">{{ status_counts.get('izin', 0) }}</strong>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="mini-metric mini-metric-neutral">
+        <span class="mini-metric-label">Lainnya</span>
+        <strong class="mini-metric-value">{{ (status_counts.values() | sum) - status_counts.get('hadir', 0) - status_counts.get('terlambat', 0) - status_counts.get('izin', 0) }}</strong>
+      </div>
+    </div>
+  </div>
+
+  {% if not target_user_id %}
+  <p class="text-muted small mb-0">Belum ada peserta untuk ditampilkan.</p>
+  {% else %}
+  <div class="calendar-grid-wrap">
+    <div class="calendar-grid calendar-grid-header">
+      <div>Sen</div><div>Sel</div><div>Rab</div><div>Kam</div><div>Jum</div><div>Sab</div><div>Min</div>
+    </div>
+    {% for week in weeks %}
+    <div class="calendar-grid">
+      {% for cell in week %}
+      {% if cell is none %}
+      <div class="calendar-cell calendar-cell-empty"></div>
+      {% else %}
+      <div class="calendar-cell {% if cell.is_today %}calendar-cell-today{% endif %} {% if cell.status %}calendar-cell-{{ cell.status }}{% endif %}">
+        <span class="calendar-cell-day">{{ cell.day }}</span>
+        {% if cell.status %}
+        <span class="calendar-cell-status">{{ cell.status }}</span>
+        {% if cell.check_in or cell.check_out %}
+        <span class="calendar-cell-time">{{ cell.check_in or '-' }}{% if cell.check_out %} - {{ cell.check_out }}{% endif %}</span>
+        {% endif %}
+        {% endif %}
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="d-flex flex-wrap gap-2 mt-3 calendar-legend">
+    <span class="calendar-legend-item"><span class="calendar-dot calendar-dot-hadir"></span>Hadir</span>
+    <span class="calendar-legend-item"><span class="calendar-dot calendar-dot-terlambat"></span>Terlambat</span>
+    <span class="calendar-legend-item"><span class="calendar-dot calendar-dot-izin"></span>Izin</span>
+    <span class="calendar-legend-item"><span class="calendar-dot calendar-dot-sakit"></span>Sakit</span>
+    <span class="calendar-legend-item"><span class="calendar-dot calendar-dot-alpa"></span>Alpa</span>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

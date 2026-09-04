@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Monitoring PKL{% endblock %}</title>
+    <meta name="theme-color" content="#6366f1">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="/static/vendor/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', path='styles.css') }}?v=20260904" rel="stylesheet">
+    <script src="/static/vendor/lucide.min.js" defer></script>
+    <script>
+      (function () {
+        try {
+          var preferred = localStorage.getItem("appTheme") || "ocean";
+          var density = localStorage.getItem("appDensity") || "comfort";
+          document.documentElement.setAttribute("data-theme", preferred);
+          document.documentElement.setAttribute("data-density", density);
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "ocean");
+          document.documentElement.setAttribute("data-density", "comfort");
+        }
+      })();
+    </script>
+  </head>
+  <body class="app-shell">
+    <div class="app-grid">
+      <aside class="app-sidebar" id="appSidebar">
+        <div class="sidebar-head">
+          <div class="sidebar-brand">
+            <div class="sidebar-logo-mark" aria-hidden="true">
+              <img src="/static/images/logos/logo_kominfo.png" alt="Kominfo">
+            </div>
+            <div class="sidebar-brand-text">
+              <p class="sidebar-kicker mb-0">Diskominfo Batu Bara</p>
+              <h1 class="sidebar-title">Monitoring PKL</h1>
+            </div>
+          </div>
+          <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-expanded="false" aria-controls="sidebarNav" aria-label="Buka menu navigasi">
+            <span></span><span></span><span></span>
+          </button>
+        </div>
+
+        <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" aria-label="Ciutkan sidebar" title="Ciutkan sidebar">
+          <i data-lucide="panel-left-close" width="16" height="16"></i>
+        </button>
+
+        <nav class="nav flex-column mt-3" id="sidebarNav">
+          <a class="nav-link {% if request.url.path == '/dashboard' %}active-route{% endif %}" href="/dashboard">
+            <i data-lucide="layout-dashboard" class="nav-icon"></i><span class="nav-label">Dashboard</span>
+          </a>
+          {% if current_user and current_user.role == 'admin' %}
+          <p class="nav-section-label">Kelola Data</p>
+          <a class="nav-link {% if request.url.path == '/participants' %}active-route{% endif %}" href="/participants">
+            <i data-lucide="users" class="nav-icon"></i><span class="nav-label">Peserta</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/supervisors' %}active-route{% endif %}" href="/supervisors">
+            <i data-lucide="user-check" class="nav-icon"></i><span class="nav-label">Pembimbing</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/institutions' %}active-route{% endif %}" href="/institutions">
+            <i data-lucide="building-2" class="nav-icon"></i><span class="nav-label">Instansi</span>
+          </a>
+          <p class="nav-section-label">Aktivitas</p>
+          <a class="nav-link {% if request.url.path == '/attendance' %}active-route{% endif %}" href="/attendance">
+            <i data-lucide="calendar-check" class="nav-icon"></i><span class="nav-label">Absensi</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/attendance/calendar' %}active-route{% endif %}" href="/attendance/calendar">
+            <i data-lucide="calendar-days" class="nav-icon"></i><span class="nav-label">Kalender Absensi</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/journal' %}active-route{% endif %}" href="/journal">
+            <i data-lucide="notebook-pen" class="nav-icon"></i><span class="nav-label">Jurnal</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/leave' %}active-route{% endif %}" href="/leave">
+            <i data-lucide="calendar-off" class="nav-icon"></i><span class="nav-label">Izin</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/face-logs' %}active-route{% endif %}" href="/face-logs">
+            <i data-lucide="scan-face" class="nav-icon"></i><span class="nav-label">Log Verifikasi Wajah</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/location-reviews' %}active-route{% endif %}" href="/location-reviews">
+            <i data-lucide="map-pinned" class="nav-icon"></i><span class="nav-label">Review Lokasi</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/announcements' %}active-route{% endif %}" href="/announcements">
+            <i data-lucide="megaphone" class="nav-icon"></i><span class="nav-label">Pengumuman</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/admin-audit' %}active-route{% endif %}" href="/admin-audit">
+            <i data-lucide="shield-check" class="nav-icon"></i><span class="nav-label">Audit Log</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/activity-log' %}active-route{% endif %}" href="/activity-log">
+            <i data-lucide="activity" class="nav-icon"></i><span class="nav-label">Log Aktivitas</span>
+          </a>
+          <p class="nav-section-label">Laporan</p>
+          <a class="nav-link" href="/api/reports/attendance/excel">
+            <i data-lucide="file-spreadsheet" class="nav-icon"></i><span class="nav-label">Laporan Excel</span>
+          </a>
+          <a class="nav-link" href="/api/reports/attendance/pdf">
+            <i data-lucide="file-text" class="nav-icon"></i><span class="nav-label">Laporan PDF</span>
+          </a>
+          <a class="nav-link" href="/api/reports/rekap/csv">
+            <i data-lucide="table-2" class="nav-icon"></i><span class="nav-label">Rekap Resmi CSV</span>
+          </a>
+          <a class="nav-link" href="/admin/backup">
+            <i data-lucide="database-backup" class="nav-icon"></i><span class="nav-label">Backup DB</span>
+          </a>
+          {% elif current_user and current_user.role == 'pembimbing' %}
+          <p class="nav-section-label">Peserta</p>
+          <a class="nav-link {% if request.url.path == '/participants' %}active-route{% endif %}" href="/participants">
+            <i data-lucide="users" class="nav-icon"></i><span class="nav-label">Peserta</span>
+          </a>
+          <p class="nav-section-label">Aktivitas</p>
+          <a class="nav-link {% if request.url.path == '/attendance' %}active-route{% endif %}" href="/attendance">
+            <i data-lucide="calendar-check" class="nav-icon"></i><span class="nav-label">Absensi</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/attendance/calendar' %}active-route{% endif %}" href="/attendance/calendar">
+            <i data-lucide="calendar-days" class="nav-icon"></i><span class="nav-label">Kalender Absensi</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/journal' %}active-route{% endif %}" href="/journal">
+            <i data-lucide="notebook-pen" class="nav-icon"></i><span class="nav-label">Jurnal</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/assessments' %}active-route{% endif %}" href="/assessments">
+            <i data-lucide="star" class="nav-icon"></i><span class="nav-label">Penilaian</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/location-reviews' %}active-route{% endif %}" href="/location-reviews">
+            <i data-lucide="map-pinned" class="nav-icon"></i><span class="nav-label">Review Lokasi</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/leave' %}active-route{% endif %}" href="/leave">
+            <i data-lucide="calendar-off" class="nav-icon"></i><span class="nav-label">Izin Peserta</span>
+          </a>
+          {% elif current_user and current_user.role == 'peserta' %}
+          <p class="nav-section-label">Aktivitas Saya</p>
+          <a class="nav-link {% if request.url.path == '/attendance' %}active-route{% endif %}" href="/attendance">
+            <i data-lucide="calendar-check" class="nav-icon"></i><span class="nav-label">Absensi Saya</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/attendance/calendar' %}active-route{% endif %}" href="/attendance/calendar">
+            <i data-lucide="calendar-days" class="nav-icon"></i><span class="nav-label">Kalender Absensi</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/journal' %}active-route{% endif %}" href="/journal">
+            <i data-lucide="notebook-pen" class="nav-icon"></i><span class="nav-label">Jurnal Saya</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/assessments' %}active-route{% endif %}" href="/assessments">
+            <i data-lucide="star" class="nav-icon"></i><span class="nav-label">Nilai Saya</span>
+          </a>
+          <a class="nav-link {% if request.url.path == '/leave' %}active-route{% endif %}" href="/leave">
+            <i data-lucide="calendar-off" class="nav-icon"></i><span class="nav-label">Izin Saya</span>
+          </a>
+          {% endif %}
+
+          <div class="nav-spacer"></div>
+          <a class="nav-link {% if request.url.path == '/profile' %}active-route{% endif %}" href="/profile">
+            <i data-lucide="user-circle" class="nav-icon"></i><span class="nav-label">Profil Saya</span>
+          </a>
+        </nav>
+      </aside>
+
+      <main class="app-main">
+        <header class="d-flex justify-content-between align-items-center app-header">
+          <h2 class="h5 mb-0">{% block page_title %}Dashboard{% endblock %}</h2>
+          <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-ghost-icon btn-sm theme-toggle" id="themeToggle" aria-label="Ganti tema" title="Ganti tema">
+              <span class="theme-swatch" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="btn btn-ghost-icon btn-sm density-toggle" id="densityToggle" aria-label="Ganti kepadatan" title="Ganti kepadatan">
+              <i data-lucide="layout-list" width="15" height="15"></i>
+            </button>
+            <div class="position-relative" id="notifBellWrap" style="display:none">
+              <button class="btn btn-ghost-icon btn-sm position-relative" id="notifBell" aria-label="Notifikasi" type="button">
+                <i data-lucide="bell" width="16" height="16"></i>
+                <span class="notif-badge d-none" id="notifBadge"></span>
+              </button>
+              <div class="notif-dropdown d-none" id="notifDropdown">
+                <div class="notif-dropdown-head d-flex justify-content-between align-items-center">
+                  <span class="fw-semibold small">Notifikasi</span>
+                  <button class="btn btn-link btn-sm p-0 text-decoration-none" id="notifReadAll" style="font-size:.78rem">Tandai semua dibaca</button>
+                </div>
+                <div id="notifList"><p class="text-muted small text-center py-3 mb-0">Tidak ada notifikasi.</p></div>
+              </div>
+            </div>
+            <div class="header-avatar" id="headerAvatar" title="{{ current_user.username if current_user else 'Guest' }}">
+              {{ (current_user.username[0] | upper) if current_user else 'G' }}
+            </div>
+            <a href="/logout" class="btn btn-ghost-icon btn-sm text-danger" title="Keluar" aria-label="Keluar">
+              <i data-lucide="log-out" width="16" height="16"></i>
+            </a>
+          </div>
+        </header>
+
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+
+    <script src="/static/vendor/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', path='js/ui-main.js') }}"></script>
+    <script>
+      // Init Lucide icons after DOM ready
+      document.addEventListener("DOMContentLoaded", function () {
+        if (window.lucide) lucide.createIcons();
+        // Auto-inject CSRF token into every form POST
+        var csrfToken = document.cookie.split("; ").find(function(r){ return r.startsWith("csrf_token="); });
+        if (csrfToken) {
+          csrfToken = csrfToken.split("=")[1];
+          document.querySelectorAll("form[method='post'],form[method='POST']").forEach(function(f) {
+            if (!f.querySelector("input[name='csrf_token']")) {
+              var inp = document.createElement("input");
+              inp.type = "hidden"; inp.name = "csrf_token"; inp.value = csrfToken;
+              f.appendChild(inp);
+            }
+          });
+        }
+      });
+      // Register PWA service worker
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/static/sw.js").catch(function(){});
+      }
+    </script>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

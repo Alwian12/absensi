@@ -15,5 +15,9 @@ class Journal(Base):
     output = Column(String(500), nullable=True)
     status = Column(String(50), nullable=False, default="pending")
     komentar = Column(String(500), nullable=True)
+    signed_by_supervisor_id = Column(Integer, ForeignKey("pembimbing.id"), nullable=True)
+    signed_at = Column(DateTime(timezone=True), nullable=True)
+    signature_token = Column(String(255), nullable=True)
 
     user = relationship("User")
+    signed_by_supervisor = relationship("Supervisor", foreign_keys=[signed_by_supervisor_id])

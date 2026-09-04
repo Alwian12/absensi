@@ -1,0 +1,34 @@
+{% extends "layout.html" %}
+{% block title %}Audit Log Admin{% endblock %}
+{% block page_title %}Audit Log Admin{% endblock %}
+
+{% block content %}
+<section class="panel-card panel-elevated">
+  <h5>Riwayat Tindakan Admin</h5>
+  <p class="text-muted mb-2">Setiap aksi sensitif admin dicatat secara otomatis untuk kebutuhan audit.</p>
+  <div class="table-responsive mt-2">
+    <table class="table table-hover align-middle small">
+      <thead>
+        <tr>
+          <th>#</th><th>Waktu</th><th>Admin</th><th>Aksi</th><th>Target</th><th>Detail</th><th>IP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td>{{ log.id }}</td>
+          <td class="text-muted">{{ log.created_at.strftime('%d/%m/%Y %H:%M') if log.created_at else '-' }}</td>
+          <td>{{ log.admin.username if log.admin else log.admin_user_id }}</td>
+          <td><span class="badge text-bg-light border text-capitalize">{{ log.action }}</span></td>
+          <td>{{ log.target.username if log.target else (log.target_user_id or '-') }}</td>
+          <td class="text-muted">{{ log.detail or '-' }}</td>
+          <td class="text-muted">{{ log.ip or '-' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted">Belum ada log audit.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

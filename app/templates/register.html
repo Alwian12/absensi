@@ -1,43 +1,211 @@
 <!doctype html>
 <html lang="id">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Register - Monitoring PKL</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  </head>
-  <body class="bg-light">
-    <div class="container py-5">
-      <div class="row justify-content-center">
-        <div class="col-md-5">
-          <div class="card shadow-sm border-0 rounded-4">
-            <div class="card-body p-4">
-              <h2 class="card-title mb-3">Daftar Akun</h2>
-              {% if error %}
-              <div class="alert alert-danger">{{ error }}</div>
-              {% endif %}
-              <form method="post">
-                <div class="mb-3">
-                  <label class="form-label">Username</label>
-                  <input type="text" name="username" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Email</label>
-                  <input type="email" name="email" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Password</label>
-                  <input type="password" name="password" class="form-control" required>
-                </div>
-                <button class="btn btn-success w-100">Daftar</button>
-              </form>
-              <div class="mt-3 text-center">
-                <a href="/login">Sudah punya akun? Masuk</a>
-              </div>
-            </div>
-          </div>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Daftar — Monitoring PKL Diskominfo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --indigo: #6366f1; --violet: #8b5cf6; --font: "Plus Jakarta Sans", system-ui, sans-serif;
+    }
+    html, body { height: 100%; font-family: var(--font); -webkit-font-smoothing: antialiased; }
+    body { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; background: #f8fafc; }
+
+    .auth-left {
+      position: relative;
+      background: linear-gradient(135deg, #0f0c29, #1a1045 40%, #302b63 75%, #24243e);
+      display: flex; flex-direction: column; justify-content: space-between;
+      padding: 2.5rem; overflow: hidden; color: #fff;
+    }
+    .blob { position: absolute; border-radius: 50%; filter: blur(72px); opacity: .55; animation: blobFloat 8s ease-in-out infinite alternate; pointer-events: none; }
+    .blob-1 { width: 380px; height: 380px; background: radial-gradient(circle, #6366f1, #4f46e5); top: -80px; left: -100px; animation-delay: 0s; }
+    .blob-2 { width: 300px; height: 300px; background: radial-gradient(circle, #10b981, #059669); bottom: 20px; right: -60px; animation-delay: -3s; }
+    .blob-3 { width: 200px; height: 200px; background: radial-gradient(circle, #f59e0b, #d97706); top: 40%; left: 30%; animation-delay: -5s; opacity: .25; }
+    @keyframes blobFloat { 0% { transform: translate(0,0) scale(1); } 100% { transform: translate(20px,-30px) scale(1.08); } }
+    .auth-left::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(rgba(255,255,255,.12) 1px, transparent 1px); background-size: 28px 28px; pointer-events: none; }
+
+    .left-header { position: relative; z-index: 2; }
+    .gov-badge { display: inline-flex; align-items: center; gap: .7rem; background: rgba(255,255,255,.1); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,.18); border-radius: 14px; padding: .6rem 1rem; margin-bottom: 2rem; }
+    .gov-badge-logo { width: 40px; height: 40px; border-radius: 8px; background: linear-gradient(135deg,#fff,#e0e7ff); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
+    .gov-badge-logo img { display: block; width: 36px; height: 36px; max-width: 100%; max-height: 100%; object-fit: contain; }
+    .gov-badge-text { line-height: 1.2; }
+    .gov-badge-sup  { font-size: .65rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.7); display: block; }
+    .gov-badge-name { font-size: .82rem; font-weight: 700; color: #fff; display: block; }
+
+    .left-title { position: relative; z-index: 2; }
+    .left-title h1 { font-size: 2.1rem; font-weight: 800; line-height: 1.2; letter-spacing: -.03em; margin-bottom: .75rem; }
+    .left-title h1 span { background: linear-gradient(90deg,#a5b4fc,#6ee7b7,#fde68a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .left-title p { color: rgba(255,255,255,.65); font-size: .95rem; line-height: 1.65; max-width: 320px; }
+
+    .left-steps { position: relative; z-index: 2; display: flex; flex-direction: column; gap: .75rem; }
+    .step-item { display: flex; align-items: flex-start; gap: .75rem; animation: fadeSlideUp .5s ease backwards; }
+    .step-item:nth-child(1) { animation-delay: .1s; }
+    .step-item:nth-child(2) { animation-delay: .2s; }
+    .step-item:nth-child(3) { animation-delay: .3s; }
+    .step-num { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg,#6366f1,#8b5cf6); display: flex; align-items: center; justify-content: center; font-size: .74rem; font-weight: 800; color: #fff; flex-shrink: 0; }
+    .step-text strong { display: block; font-size: .84rem; font-weight: 700; color: #fff; }
+    .step-text span { font-size: .77rem; color: rgba(255,255,255,.6); }
+
+    .auth-right { display: flex; align-items: center; justify-content: center; padding: 2rem; background: #f8fafc; }
+    .auth-form-card { width: 100%; max-width: 420px; animation: fadeSlideUp .45s ease backwards; }
+
+    .form-eyebrow { font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--indigo); margin-bottom: .35rem; }
+    .form-headline { font-size: 1.6rem; font-weight: 800; color: #0f172a; letter-spacing: -.03em; margin-bottom: .35rem; }
+    .form-sub { font-size: .875rem; color: #64748b; margin-bottom: 1.75rem; }
+
+    .alert-error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 10px; padding: .75rem 1rem; font-size: .855rem; margin-bottom: 1.25rem; display: flex; align-items: flex-start; gap: .5rem; }
+
+    .input-float { position: relative; margin-bottom: 1.1rem; }
+    .input-float input {
+      width: 100%; padding: 1rem .9rem .35rem; font-family: var(--font); font-size: .9rem;
+      border: 1.5px solid #e2e8f0; border-radius: 12px; background: #fff; color: #0f172a;
+      outline: none; transition: border-color .2s, box-shadow .2s; appearance: none;
+    }
+    .input-float input:focus { border-color: var(--indigo); box-shadow: 0 0 0 3px rgba(99,102,241,.12); }
+    .input-float label { position: absolute; left: .9rem; top: .65rem; font-size: .78rem; font-weight: 600; color: #94a3b8; pointer-events: none; transition: all .15s; letter-spacing: .02em; }
+    .input-float input:focus ~ label,
+    .input-float input:not(:placeholder-shown) ~ label { top: .3rem; font-size: .67rem; color: var(--indigo); }
+    .input-float .show-pass { position: absolute; right: .75rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: #94a3b8; cursor: pointer; padding: .25rem; border-radius: 6px; display: flex; align-items: center; transition: color .15s; }
+    .input-float .show-pass:hover { color: var(--indigo); }
+
+    .btn-login { width: 100%; padding: .85rem; background: linear-gradient(135deg,var(--indigo),var(--violet)); border: none; border-radius: 12px; color: #fff; font-family: var(--font); font-size: .95rem; font-weight: 700; cursor: pointer; transition: all .2s; box-shadow: 0 4px 14px rgba(99,102,241,.35); display: flex; align-items: center; justify-content: center; gap: .5rem; margin-top: .25rem; }
+    .btn-login:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(99,102,241,.45); }
+    .btn-login.loading { opacity: .75; pointer-events: none; }
+    .btn-login .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; display: none; }
+    .btn-login.loading .spinner { display: block; }
+    .btn-login.loading .btn-text { display: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .role-note { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: .65rem .9rem; font-size: .8rem; color: #166534; margin-bottom: 1.25rem; display: flex; align-items: center; gap: .5rem; }
+    .role-note svg { width: 14px; height: 14px; stroke: #16a34a; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+    .form-footer { text-align: center; margin-top: 1.4rem; font-size: .855rem; color: #64748b; }
+    .form-footer a { color: var(--indigo); font-weight: 600; text-decoration: none; }
+    .form-footer a:hover { text-decoration: underline; }
+
+    .trusted-bar { display: flex; align-items: center; gap: .5rem; justify-content: center; margin-top: 2rem; font-size: .74rem; color: #94a3b8; }
+    .trusted-bar svg { width: 13px; height: 13px; stroke: #10b981; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+
+    @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+
+    @media (max-width: 900px) {
+      body { grid-template-columns: 1fr; }
+      .auth-left { display: none; }
+      .auth-right { background: linear-gradient(160deg,#eef2ff,#f8fafc 55%,#f0f9ff); min-height: 100vh; padding: 2rem 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="auth-left">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+
+    <div class="left-header">
+      <div class="gov-badge">
+        <div class="gov-badge-logo">
+          <img src="/static/images/logos/logo_kominfo.png"
+               alt="Kominfo" onerror="this.style.display='none'">
+        </div>
+        <div class="gov-badge-text">
+          <span class="gov-badge-sup">Pemerintah Kab. Batu Bara</span>
+          <span class="gov-badge-name">Diskominfo</span>
         </div>
       </div>
+      <div class="left-title">
+        <h1>Bergabung ke<br><span>Sistem PKL</span></h1>
+        <p>Daftarkan diri untuk mulai tracking absensi, mengisi jurnal harian, dan memantau progres PKL kamu.</p>
+      </div>
     </div>
-  </body>
+
+    <div class="left-steps">
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>Isi data pendaftaran</strong><span>Username, email, dan password yang kuat</span></div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <div class="step-text"><strong>Akun peserta otomatis dibuat</strong><span>Role peserta ditetapkan oleh sistem</span></div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>Mulai gunakan sistem</strong><span>Absensi, jurnal, dan pantau penilaian</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-right">
+    <div class="auth-form-card">
+      <p class="form-eyebrow">Buat Akun Baru</p>
+      <h2 class="form-headline">Daftar sekarang ✨</h2>
+      <p class="form-sub">Isi data di bawah untuk membuat akun peserta.</p>
+
+      <div class="role-note">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        Akun baru otomatis terdaftar sebagai <strong>Peserta PKL</strong>
+      </div>
+
+      {% if error %}
+      <div class="alert-error">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        {{ error }}
+      </div>
+      {% endif %}
+
+      <form method="post" id="registerForm">
+        <div class="input-float">
+          <input type="text" name="username" id="regUser" placeholder=" " required autocomplete="username">
+          <label for="regUser">Username</label>
+        </div>
+        <div class="input-float">
+          <input type="email" name="email" id="regEmail" placeholder=" " required autocomplete="email">
+          <label for="regEmail">Alamat Email</label>
+        </div>
+        <div class="input-float">
+          <input type="password" name="password" id="regPassword" placeholder=" " required autocomplete="new-password" style="padding-right:2.5rem">
+          <label for="regPassword">Password (min. 6 karakter)</label>
+          <button type="button" class="show-pass" id="toggleRegPass" aria-label="Tampilkan password">
+            <svg id="eyeIconReg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <button class="btn-login" type="submit" id="registerBtn">
+          <span class="spinner"></span>
+          <span class="btn-text">Buat Akun</span>
+        </button>
+      </form>
+
+      <div class="form-footer">
+        Sudah punya akun? <a href="/login">Masuk di sini</a>
+      </div>
+
+      <div class="trusted-bar">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        Data aman &amp; terenkripsi — Diskominfo Kab. Batu Bara
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var togBtn = document.getElementById("toggleRegPass");
+    var pwdField = document.getElementById("regPassword");
+    var eyeIcon = document.getElementById("eyeIconReg");
+    if (togBtn && pwdField) {
+      togBtn.addEventListener("click", function () {
+        var isHidden = pwdField.type === "password";
+        pwdField.type = isHidden ? "text" : "password";
+        eyeIcon.innerHTML = isHidden
+          ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
+          : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+      });
+    }
+    document.getElementById("registerForm").addEventListener("submit", function () {
+      document.getElementById("registerBtn").classList.add("loading");
+    });
+  </script>
+</body>
 </html>

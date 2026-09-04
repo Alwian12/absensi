@@ -1,48 +1,155 @@
-<!doctype html>
-<html lang="id">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Pembimbing - Monitoring PKL</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  </head>
-  <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-      <div class="container">
-        <a class="navbar-brand" href="/dashboard">Monitoring PKL</a>
-      </div>
-    </nav>
-    <div class="container py-4">
-      <h2 class="mb-4">Data Pembimbing</h2>
-      <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body">
-          <h5>Tambah Pembimbing</h5>
-          <form method="post" class="row g-2">
-            <div class="col-md-4"><input class="form-control" name="nama_lengkap" placeholder="Nama lengkap" required></div>
-            <div class="col-md-3"><input class="form-control" name="bidang" placeholder="Bidang"></div>
-            <div class="col-md-3">
-              <select class="form-select" name="user_id">
-                {% for user in users %}
-                <option value="{{ user.id }}">{{ user.username }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="col-md-2"><button class="btn btn-primary w-100">Simpan</button></div>
-          </form>
-        </div>
-      </div>
-      <div class="card shadow-sm border-0">
-        <div class="card-body">
-          <table class="table table-striped">
-            <thead><tr><th>#</th><th>Nama</th><th>Bidang</th></tr></thead>
-            <tbody>
-              {% for supervisor in supervisors %}
-              <tr><td>{{ supervisor.id }}</td><td>{{ supervisor.nama_lengkap }}</td><td>{{ supervisor.bidang }}</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
+{% extends "layout.html" %}
+
+{% block title %}Pembimbing - Monitoring PKL{% endblock %}
+{% block page_title %}Manajemen Pembimbing{% endblock %}
+
+{% block content %}
+
+{% if users_without_profile %}
+<section class="panel-card mb-3" style="border-left:4px solid #f59e0b">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h5 class="mb-0">Akun Pembimbing Belum Terhubung Profil</h5>
+    <span class="badge text-bg-warning">{{ users_without_profile|length }} akun</span>
+  </div>
+  <p class="text-muted small mb-2">Akun berikut sudah memiliki role pembimbing tapi belum dibuatkan profil pembimbing (nama, NIP, jabatan).</p>
+  <div class="d-flex flex-wrap gap-2">
+    {% for u in users_without_profile %}
+    <span class="badge px-3 py-2" style="background:#fffbeb;color:#92400e;border:1px solid #fde68a;font-size:.8rem">
+      {{ u.username }} — belum ada profil
+    </span>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="panel-card mb-3">
+  <h5>Buat Akun + Profil Pembimbing</h5>
+  <p class="text-muted small mb-2">Gunakan ini jika pembimbing belum memiliki akun. Akun dan profil dibuat sekaligus.</p>
+  <form method="post" action="/supervisors/create-account" class="row g-2 mt-1">
+    <div class="col-lg-3"><input class="form-control" name="nama_lengkap" placeholder="Nama lengkap" required></div>
+    <div class="col-lg-2"><input class="form-control" name="username" placeholder="Username" required autocomplete="off"></div>
+    <div class="col-lg-3"><input class="form-control" type="email" name="email" placeholder="Email" required autocomplete="off"></div>
+    <div class="col-lg-2"><input class="form-control" type="password" name="password" placeholder="Password" minlength="8" required autocomplete="new-password"></div>
+    <div class="col-lg-2"><input class="form-control" name="nip" placeholder="NIP"></div>
+    <div class="col-lg-2"><input class="form-control" name="jabatan" placeholder="Jabatan"></div>
+    <div class="col-lg-2"><input class="form-control" name="bidang" placeholder="Bidang (opsional)"></div>
+    <div class="col-lg-2"><button class="btn btn-primary w-100" type="submit">Buat Akun</button></div>
+  </form>
+</section>
+
+<section class="panel-card mb-3">
+  <h5>Tambah Pembimbing</h5>
+  <p class="text-muted small mb-2">Gunakan ini hanya untuk menghubungkan akun pembimbing yang sudah ada.</p>
+  <form method="post" class="row g-2 mt-1">
+    <div class="col-lg-3"><input class="form-control" name="nama_lengkap" placeholder="Nama lengkap" required></div>
+    <div class="col-lg-2"><input class="form-control" name="nip" placeholder="NIP"></div>
+    <div class="col-lg-2"><input class="form-control" name="jabatan" placeholder="Jabatan"></div>
+    <div class="col-lg-1"><input class="form-control" name="bidang" placeholder="Bidang (opsional)"></div>
+    <div class="col-lg-2">
+      <select class="form-select" name="user_id" required>
+        {% for user in users %}
+        <option value="{{ user.id }}">{{ user.username }}</option>
+        {% else %}
+        <option value="">Belum ada akun pembimbing yang belum terhubung</option>
+        {% endfor %}
+      </select>
     </div>
-  </body>
-</html>
+    <div class="col-lg-2"><button class="btn btn-primary w-100">Simpan</button></div>
+  </form>
+</section>
+
+<section class="panel-card">
+  <h5>Daftar Pembimbing</h5>
+  <div class="table-responsive mt-2">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>#</th><th>Nama</th><th>NIP</th><th>Jabatan</th><th>Bidang</th>
+          <th>Akun</th><th>Kontrol</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sv in supervisors %}
+        <tr>
+          <td>{{ sv.id }}</td>
+          <td>
+            <button class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#editSv{{ sv.id }}"
+                    aria-expanded="false">
+              {{ sv.nama_lengkap }}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ms-1"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <div class="collapse mt-2" id="editSv{{ sv.id }}">
+              <form method="post" action="/supervisors/{{ sv.id }}/edit" class="d-flex flex-column gap-1 p-2 rounded border bg-body-tertiary">
+                <input class="form-control form-control-sm" name="nama_lengkap" value="{{ sv.nama_lengkap }}" placeholder="Nama" required>
+                <input class="form-control form-control-sm" name="nip" value="{{ sv.nip or '' }}" placeholder="NIP">
+                <input class="form-control form-control-sm" name="jabatan" value="{{ sv.jabatan or '' }}" placeholder="Jabatan">
+                <input class="form-control form-control-sm" name="bidang" value="{{ sv.bidang or '' }}" placeholder="Bidang">
+                <button class="btn btn-sm btn-primary">Simpan</button>
+              </form>
+            </div>
+          </td>
+          <td>{{ sv.nip or '-' }}</td>
+          <td>{{ sv.jabatan or '-' }}</td>
+          <td>{{ sv.bidang or '-' }}</td>
+          <td>
+            {% if sv.user %}
+            <span class="fw-semibold">{{ sv.user.username }}</span>
+            <br><small class="text-muted">{{ sv.user.email }}</small>
+            {% if not sv.user.is_active %}
+            <br><span class="badge text-bg-danger mt-1">Nonaktif</span>
+            {% endif %}
+            {% else %}
+            <span class="text-muted small">Tidak terhubung</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if sv.user %}
+            <div class="d-flex flex-column gap-1">
+              <form method="post" action="/users/{{ sv.user.id }}/password" class="d-flex gap-1">
+                <input type="hidden" name="redirect_to" value="/supervisors">
+                <input class="form-control form-control-sm" type="password" name="new_password" minlength="8" placeholder="Password baru" required style="max-width:140px">
+                <button class="btn btn-sm btn-outline-primary" type="submit">Ubah</button>
+              </form>
+              <div class="d-flex gap-1">
+                <form method="post" action="/users/{{ sv.user.id }}/force-logout">
+                  <input type="hidden" name="redirect_to" value="/supervisors">
+                  <button class="btn btn-sm btn-outline-secondary" type="submit" title="Logout semua sesi">
+                    <i data-lucide="log-out" width="13" height="13"></i> Force Logout
+                  </button>
+                </form>
+                {% if sv.user.is_active %}
+                <form method="post" action="/users/{{ sv.user.id }}/soft-delete" onsubmit="return confirm('Nonaktifkan akun {{ sv.user.username }}?')">
+                  <input type="hidden" name="redirect_to" value="/supervisors">
+                  <button class="btn btn-sm btn-outline-danger" type="submit">Nonaktifkan</button>
+                </form>
+                {% endif %}
+                <form method="post" action="/users/{{ sv.user.id }}/delete" onsubmit="return confirm('Hapus permanen akun dan seluruh data pembimbing ini? Tindakan tidak dapat dibatalkan.')">
+                  <input type="hidden" name="redirect_to" value="/supervisors">
+                  <input type="hidden" name="confirmation" value="HAPUS">
+                  <button class="btn btn-sm btn-danger" type="submit">Hapus Permanen</button>
+                </form>
+              </div>
+            </div>
+            {% else %}
+            <span class="text-muted small">-</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center">
+            <div class="empty-state py-2">
+              <p class="mb-1 fw-semibold">Belum ada data pembimbing.</p>
+              <small class="text-muted">Tambahkan dari formulir di atas.</small>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

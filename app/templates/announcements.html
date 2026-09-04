@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+{% block title %}Pengumuman{% endblock %}
+{% block page_title %}Manajemen Pengumuman{% endblock %}
+
+{% block content %}
+<section class="panel-card mb-3 panel-elevated">
+  <h5>Buat Pengumuman Baru</h5>
+  <form method="post" class="mt-2">
+    <div class="mb-2"><input class="form-control" name="title" placeholder="Judul pengumuman" required></div>
+    <div class="mb-2"><textarea class="form-control" name="content" rows="3" placeholder="Isi pengumuman..." required></textarea></div>
+    <button class="btn btn-primary">Terbitkan</button>
+  </form>
+</section>
+
+<section class="panel-card panel-elevated">
+  <h5>Daftar Pengumuman</h5>
+  <div class="table-responsive mt-2">
+    <table class="table table-hover align-middle">
+      <thead><tr><th>#</th><th>Judul</th><th>Isi</th><th>Status</th><th>Aksi</th></tr></thead>
+      <tbody>
+        {% for ann in announcements %}
+        <tr>
+          <td>{{ ann.id }}</td>
+          <td class="fw-semibold">{{ ann.title }}</td>
+          <td class="text-muted small">{{ ann.content[:80] }}{% if ann.content|length > 80 %}…{% endif %}</td>
+          <td>
+            <span class="badge {% if ann.is_active %}text-bg-success{% else %}text-bg-secondary{% endif %}">
+              {% if ann.is_active %}Aktif{% else %}Nonaktif{% endif %}
+            </span>
+          </td>
+          <td>
+            <form method="post" action="/announcements/{{ ann.id }}/toggle" class="d-inline">
+              <button class="btn btn-sm btn-outline-secondary">Toggle</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted">Belum ada pengumuman.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

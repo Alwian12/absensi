@@ -13,6 +13,8 @@ class Participant(Base):
     nama_lengkap = Column(String(150), nullable=False)
     jurusan = Column(String(100), nullable=True)
     instansi = Column(String(150), nullable=True)
+    tanggal_mulai = Column(DateTime(timezone=True), nullable=True)
+    tanggal_selesai = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="participant")

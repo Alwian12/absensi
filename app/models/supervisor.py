@@ -11,6 +11,8 @@ class Supervisor(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
     nama_lengkap = Column(String(150), nullable=False)
+    nip = Column(String(50), nullable=True)
+    jabatan = Column(String(120), nullable=True)
     bidang = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

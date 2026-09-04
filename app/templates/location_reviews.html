@@ -1,0 +1,126 @@
+{% extends "layout.html" %}
+{% from '_pagination.html' import pagination %}
+
+{% block title %}Review Lokasi Absensi - Monitoring PKL{% endblock %}
+{% block page_title %}Review Lokasi Absensi{% endblock %}
+
+{% block content %}
+<section class="panel-card mb-3 context-banner">
+  <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 align-items-start align-items-lg-center">
+    <div>
+      <p class="summary-kicker mb-1 text-uppercase">Audit Review Lokasi</p>
+      <h5 class="mb-1">Antrian Review Geofence</h5>
+      <p class="text-muted mb-0">Kelola approval lokasi absensi yang masuk area grace atau terdeteksi anomali perpindahan lokasi.</p>
+    </div>
+    <a href="/attendance?review_filter=pending" class="btn btn-outline-primary btn-sm">Buka Tabel Absensi</a>
+  </div>
+</section>
+
+<section class="row g-3 mb-3">
+  <div class="col-md-3">
+    <div class="panel-card h-100">
+      <p class="text-muted small mb-1">Total Pending</p>
+      <h4 class="mb-0">{{ total_pending }}</h4>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="panel-card h-100">
+      <p class="text-muted small mb-1">SLA < 24 jam</p>
+      <h4 class="mb-0 text-success">{{ pending_lt24 }}</h4>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="panel-card h-100">
+      <p class="text-muted small mb-1">SLA 24-72 jam</p>
+      <h4 class="mb-0 text-warning">{{ pending_24_72 }}</h4>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="panel-card h-100">
+      <p class="text-muted small mb-1">SLA > 72 jam</p>
+      <h4 class="mb-0 text-danger">{{ pending_gt72 }}</h4>
+    </div>
+  </div>
+</section>
+
+<section class="panel-card mb-3">
+  <h5>Filter Review</h5>
+  <div class="d-flex flex-wrap gap-2 mt-2">
+    <a href="/location-reviews?review_filter=pending" class="btn btn-sm {% if review_filter == 'pending' %}btn-warning{% else %}btn-outline-warning{% endif %}">Pending</a>
+    <a href="/location-reviews?review_filter=approved" class="btn btn-sm {% if review_filter == 'approved' %}btn-success{% else %}btn-outline-success{% endif %}">Approved</a>
+    <a href="/location-reviews?review_filter=rejected" class="btn btn-sm {% if review_filter == 'rejected' %}btn-danger{% else %}btn-outline-danger{% endif %}">Rejected</a>
+    <a href="/location-reviews?review_filter=grace" class="btn btn-sm {% if review_filter == 'grace' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">Reason Grace</a>
+    <a href="/location-reviews?review_filter=risk" class="btn btn-sm {% if review_filter == 'risk' %}btn-dark{% else %}btn-outline-dark{% endif %}">Reason Risk</a>
+  </div>
+</section>
+
+<section class="panel-card">
+  <h5>Audit Trail Review Lokasi</h5>
+  <div class="table-responsive mt-2">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>User</th>
+          <th>Tanggal</th>
+          <th>Status Review</th>
+          <th>Reason</th>
+          <th>Jarak</th>
+          <th>Aging</th>
+          <th>Reviewer</th>
+          <th>Catatan</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in reviews %}
+        {% set age = age_hours_map.get(row.id, 0) %}
+        <tr>
+          <td>{{ row.id }}</td>
+          <td>{{ row.user.username if row.user else ('User ' ~ row.user_id) }}</td>
+          <td>{{ row.attendance_date.strftime('%d/%m/%Y %H:%M') if row.attendance_date else '-' }}</td>
+          <td>
+            <span class="badge {% if row.location_review_status == 'approved' %}text-bg-success{% elif row.location_review_status == 'rejected' %}text-bg-danger{% elif row.location_review_status == 'pending' %}text-bg-warning{% else %}text-bg-light border{% endif %}">
+              {{ row.location_review_status or 'not_required' }}
+            </span>
+          </td>
+          <td>
+            <span class="badge {% if row.location_review_reason == 'grace' %}text-bg-secondary{% elif row.location_review_reason == 'risk' %}text-bg-dark{% elif row.location_review_reason == 'grace_and_risk' %}text-bg-primary{% else %}text-bg-light border{% endif %}">
+              {{ row.location_review_reason or '-' }}
+            </span>
+          </td>
+          <td>{{ (row.distance_from_office_m or 0) | round(1) }} m</td>
+          <td>
+            <span class="badge {% if age > 72 %}text-bg-danger{% elif age >= 24 %}text-bg-warning{% else %}text-bg-success{% endif %}">{{ age }} jam</span>
+          </td>
+          <td>
+            {% if row.location_reviewed_by_user_id %}
+            {{ reviewer_map.get(row.location_reviewed_by_user_id, 'User ' ~ row.location_reviewed_by_user_id) }}
+            {% if row.location_reviewed_at %}
+            <br><small class="text-muted">{{ row.location_reviewed_at.strftime('%d/%m %H:%M') }}</small>
+            {% endif %}
+            {% else %}
+            <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td>{{ row.location_review_note or '-' }}</td>
+          <td>
+            <form method="post" action="/attendance/{{ row.id }}/location-review" class="d-flex flex-column gap-1">
+              <input type="text" class="form-control form-control-sm" name="note" placeholder="Catatan review">
+              <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-outline-success" type="submit" name="decision" value="approved">Approve</button>
+                <button class="btn btn-sm btn-outline-danger" type="submit" name="decision" value="rejected">Reject</button>
+                <button class="btn btn-sm btn-outline-secondary" type="submit" name="decision" value="reset">Reset</button>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="10" class="text-center text-muted">Belum ada data review lokasi untuk filter ini.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pagination(current_page, total_pages, base_url) }}
+</section>
+{% endblock %}

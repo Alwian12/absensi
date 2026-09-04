@@ -1,0 +1,192 @@
+{% extends "layout.html" %}
+
+{% block title %}Log Verifikasi Wajah - Monitoring PKL{% endblock %}
+{% block page_title %}Log Verifikasi Wajah{% endblock %}
+
+{% block content %}
+<section class="panel-card mb-3 context-banner">
+  <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 align-items-start align-items-lg-center">
+    <div>
+      <p class="summary-kicker mb-1 text-uppercase">Akses {{ current_user.role if current_user else 'guest' }}</p>
+      <h5 class="mb-1">Audit Keamanan Verifikasi Wajah</h5>
+      <p class="text-muted mb-0">Pantau pola gagal verifikasi, percobaan terblokir, dan kualitas confidence per pengguna.</p>
+    </div>
+    <span class="badge rounded-pill summary-badge">Role: {{ current_user.role if current_user else 'guest' }}</span>
+  </div>
+</section>
+
+<section class="panel-card mb-3">
+  <h5>Filter Log</h5>
+  <form method="get" class="row g-2 mt-1">
+    <div class="col-lg-3">
+      <select class="form-select" name="result">
+        <option value="all" {% if result_filter == 'all' %}selected{% endif %}>Semua hasil</option>
+        <option value="success" {% if result_filter == 'success' %}selected{% endif %}>Berhasil</option>
+        <option value="failed" {% if result_filter == 'failed' %}selected{% endif %}>Gagal</option>
+        <option value="blocked" {% if result_filter == 'blocked' %}selected{% endif %}>Diblokir</option>
+      </select>
+    </div>
+    <div class="col-lg-3">
+      <select class="form-select" name="action">
+        <option value="all" {% if action_filter == 'all' %}selected{% endif %}>Semua aksi</option>
+        <option value="checkin" {% if action_filter == 'checkin' %}selected{% endif %}>Check-in</option>
+        <option value="checkout" {% if action_filter == 'checkout' %}selected{% endif %}>Check-out</option>
+      </select>
+    </div>
+    <div class="col-lg-2">
+      <input type="date" class="form-control" name="from_date" value="{{ from_date_filter }}" title="Dari tanggal">
+    </div>
+    <div class="col-lg-2">
+      <input type="date" class="form-control" name="to_date" value="{{ to_date_filter }}" title="Sampai tanggal">
+    </div>
+    <div class="col-lg-2">
+      <select class="form-select" name="limit">
+        {% for x in [50, 100, 200, 500] %}
+        <option value="{{ x }}" {% if limit_filter == x %}selected{% endif %}>{{ x }} baris</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-lg-2"><button class="btn btn-primary w-100">Terapkan</button></div>
+    <div class="col-lg-2">
+      <a class="btn btn-outline-secondary w-100" href="/face-logs">Reset Filter</a>
+    </div>
+    <div class="col-lg-2">
+      <a
+        class="btn btn-outline-success w-100"
+        href="/face-logs/export.csv?result={{ result_filter }}&action={{ action_filter }}&from_date={{ from_date_filter }}&to_date={{ to_date_filter }}&limit={{ limit_filter }}"
+      >
+        Export CSV
+      </a>
+    </div>
+  </form>
+</section>
+
+<section class="row g-3 mb-3">
+  <div class="col-md-6 col-xl-3">
+    <div class="metric-card h-100">
+      <p>Total Verifikasi 24 Jam</p>
+      <h3>{{ total_24h }}</h3>
+      <small class="text-muted">Semua hasil verifikasi</small>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="metric-card h-100">
+      <p>Success Rate 24 Jam</p>
+      <h3>{{ success_rate_24h }}%</h3>
+      <small class="text-muted">Rasio verifikasi cocok</small>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="metric-card h-100">
+      <p>Gagal 24 Jam</p>
+      <h3>{{ failed_24h }}</h3>
+      <small class="text-muted">Termasuk reject dan blocked</small>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="metric-card h-100">
+      <p>Blocked 24 Jam</p>
+      <h3>{{ blocked_24h }}</h3>
+      <small class="text-muted">Terlalu banyak gagal beruntun</small>
+    </div>
+  </div>
+</section>
+
+<section class="panel-card mb-3">
+  <h5>Tren Verifikasi 7 Hari</h5>
+  <canvas id="faceTrendChart" height="110"></canvas>
+</section>
+
+<section class="panel-card">
+  <h5>Riwayat Verifikasi</h5>
+  <div class="table-responsive mt-2">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Waktu</th>
+          <th>User</th>
+          <th>Aksi</th>
+          <th>Hasil</th>
+          <th>Similarity</th>
+          <th>Confidence</th>
+          <th>Engine</th>
+          <th>IP</th>
+          <th>Pesan</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in logs %}
+        <tr>
+          <td>{{ item.id }}</td>
+          <td>{{ item.created_at.strftime('%d/%m/%Y %H:%M:%S') if item.created_at else '-' }}</td>
+          <td>{{ user_map.get(item.user_id, 'User ' ~ item.user_id) }}</td>
+          <td class="text-capitalize">{{ item.action }}</td>
+          <td>
+            {% if item.attempt_blocked %}
+            <span class="badge text-bg-danger">Blocked</span>
+            {% elif item.matched %}
+            <span class="badge text-bg-success">Matched</span>
+            {% else %}
+            <span class="badge text-bg-warning">Rejected</span>
+            {% endif %}
+          </td>
+          <td>{{ item.similarity if item.similarity is not none else '-' }}</td>
+          <td>{{ item.confidence if item.confidence is not none else '-' }}</td>
+          <td>{{ item.engine or '-' }}</td>
+          <td>{{ item.source_ip or '-' }}</td>
+          <td>{{ item.message or '-' }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="10" class="text-center">
+            <div class="empty-state py-2">
+              <p class="mb-1 fw-semibold">Belum ada log verifikasi.</p>
+              <small class="text-muted">Log akan muncul setelah pengguna melakukan registrasi atau verifikasi wajah.</small>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+  const trendCanvas = document.getElementById("faceTrendChart");
+  if (trendCanvas) {
+    new Chart(trendCanvas, {
+      type: "line",
+      data: {
+        labels: {{ trend_labels | tojson }},
+        datasets: [
+          {
+            label: "Berhasil",
+            data: {{ trend_success | tojson }},
+            borderColor: "#15803d",
+            backgroundColor: "rgba(21,128,61,0.15)",
+            tension: 0.25,
+            fill: true
+          },
+          {
+            label: "Gagal",
+            data: {{ trend_failed | tojson }},
+            borderColor: "#b91c1c",
+            backgroundColor: "rgba(185,28,28,0.12)",
+            tension: 0.25,
+            fill: true
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: "top" } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  }
+</script>
+{% endblock %}

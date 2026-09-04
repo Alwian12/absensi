@@ -1,28 +1,42 @@
-# Spesifikasi REST API
+# Spesifikasi REST API (Backend Python - Frontend JavaScript)
 
-## Auth
-- POST /login
-- POST /logout
-- POST /register
+Frontend JavaScript mengakses endpoint backend Python FastAPI melalui namespace `/api/*`.
 
-## Face Recognition
-- POST /face/register
-- POST /face/verify
+## Auth API
+- POST /auth/login
+- POST /auth/register
 
-## Attendance
-- POST /attendance/checkin
-- POST /attendance/checkout
-- GET /attendance/history
+## Face Recognition API
+- POST /api/face/register
+- POST /api/face/verify
 
-## Journal
-- POST /journal
-- PUT /journal/{id}
-- DELETE /journal/{id}
-- GET /journal
+## Attendance API
+- POST /api/attendance/checkin
+- GET /api/attendance/history
+- POST /api/attendance/manual
 
-## Management
-- GET /users
+## Dashboard API
+- GET /api/dashboard
+
+## Journal API
+- GET /api/journal
+- POST /api/journal
+
+## Reports API
+- GET /api/reports/attendance/excel
+- GET /api/reports/attendance/pdf
+
+## Catatan RBAC
+- Route manajemen web (`/participants`, `/supervisors`, `/institutions`) dibatasi untuk role `admin` atau `pembimbing` sesuai modul.
+- Endpoint laporan `/api/reports/*` hanya untuk role `admin`.
+- Endpoint API dapat memakai cookie sesi web atau bearer token JWT.
+
+## Web Routes (Jinja2 + JavaScript)
+- GET /login
+- GET /dashboard
+- GET /attendance
 - GET /participants
 - GET /supervisors
-- GET /dashboard
-- GET /reports
+- GET /institutions
+- GET /journal
+- GET /assessments

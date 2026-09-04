@@ -1,47 +1,179 @@
-<!doctype html>
-<html lang="id">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Peserta - Monitoring PKL</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  </head>
-  <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-      <div class="container">
-        <a class="navbar-brand" href="/dashboard">Monitoring PKL</a>
+{% extends "layout.html" %}
+{% from '_pagination.html' import pagination %}
+{% block title %}Peserta - Monitoring PKL{% endblock %}
+{% block page_title %}Manajemen Peserta{% endblock %}
+
+{% block content %}
+
+{% if users_without_profile %}
+<section class="panel-card mb-3" style="border-left:4px solid #f59e0b">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h5 class="mb-0">Peserta Belum Isi Profil PKL</h5>
+    <span class="badge text-bg-warning">{{ users_without_profile|length }} akun</span>
+  </div>
+  <p class="text-muted small mb-2">Akun berikut sudah terdaftar tapi belum melengkapi data nama, jurusan, dan instansi.</p>
+  {% if can_manage_password %}
+  <div class="d-flex flex-column gap-2">
+    {% for u in users_without_profile %}
+    <div class="border rounded p-2" style="background:#fffbeb;border-color:#fde68a!important">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <span class="small fw-semibold" style="color:#92400e">{{ u.username }} — {{ u.email }}</span>
+        <span class="badge text-bg-warning">Belum isi profil</span>
       </div>
-    </nav>
-    <div class="container py-4">
-      <h2 class="mb-4">Data Peserta</h2>
-      <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body">
-          <h5>Tambah Peserta</h5>
-          <form method="post" class="row g-2">
-            <div class="col-md-3"><input class="form-control" name="nama_lengkap" placeholder="Nama lengkap" required></div>
-            <div class="col-md-2"><input class="form-control" name="jurusan" placeholder="Jurusan"></div>
-            <div class="col-md-2"><input class="form-control" name="instansi" placeholder="Instansi"></div>
-            <div class="col-md-2"><select class="form-select" name="user_id">
-              {% for user in users %}
-              <option value="{{ user.id }}">{{ user.username }}</option>
-              {% endfor %}
-            </select></div>
-            <div class="col-md-2"><button class="btn btn-primary w-100">Simpan</button></div>
-          </form>
-        </div>
-      </div>
-      <div class="card shadow-sm border-0">
-        <div class="card-body">
-          <table class="table table-striped">
-            <thead><tr><th>#</th><th>Nama</th><th>Jurusan</th><th>Instansi</th></tr></thead>
-            <tbody>
-              {% for participant in participants %}
-              <tr><td>{{ participant.id }}</td><td>{{ participant.nama_lengkap }}</td><td>{{ participant.jurusan }}</td><td>{{ participant.instansi }}</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+      <div class="row g-2">
+        <form method="post" action="/participants/complete-profile/{{ u.id }}" class="col-lg-8 row g-2">
+          <div class="col-md-4"><input class="form-control form-control-sm" name="nama_lengkap" placeholder="Nama lengkap" required></div>
+          <div class="col-md-3"><input class="form-control form-control-sm" name="jurusan" placeholder="Jurusan"></div>
+          <div class="col-md-5"><input class="form-control form-control-sm" name="instansi" placeholder="Instansi" list="institutionOptions" required></div>
+          <div class="col-md-6"><input class="form-control form-control-sm" type="date" name="tanggal_mulai" title="Tanggal mulai PKL" required></div>
+          <div class="col-md-6"><input class="form-control form-control-sm" type="date" name="tanggal_selesai" title="Tanggal selesai PKL" required></div>
+          <div class="col-12"><button class="btn btn-sm btn-primary" type="submit">Buat Profil Peserta</button></div>
+        </form>
+        <form method="post" action="/users/{{ u.id }}/password" class="col-lg-4">
+          <input type="hidden" name="redirect_to" value="/participants">
+          <label class="small text-muted">Reset password</label>
+          <div class="d-flex gap-2">
+            <input class="form-control form-control-sm" type="password" name="new_password" minlength="6" placeholder="Password baru" required>
+            <button class="btn btn-sm btn-outline-primary" type="submit">Reset</button>
+          </div>
+        </form>
       </div>
     </div>
-  </body>
-</html>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="d-flex flex-wrap gap-2">
+    {% for u in users_without_profile %}
+    <span class="badge d-flex align-items-center gap-1 px-3 py-2" style="background:#fffbeb;color:#92400e;border:1px solid #fde68a;font-size:.8rem">
+      {{ u.username }} — belum isi profil
+    </span>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="panel-card mb-3">
+  <h5>Tambah Peserta</h5>
+  <form method="post" class="row g-2 mt-1">
+    <div class="col-lg-3"><input class="form-control" name="nama_lengkap" placeholder="Nama lengkap" required></div>
+    <div class="col-lg-2"><input class="form-control" name="jurusan" placeholder="Jurusan"></div>
+    <div class="col-lg-3"><input class="form-control" name="instansi" placeholder="Instansi" list="institutionOptions"></div>
+    <div class="col-lg-2"><input class="form-control" type="date" name="tanggal_mulai" title="Tanggal mulai PKL" required></div>
+    <div class="col-lg-2"><input class="form-control" type="date" name="tanggal_selesai" title="Tanggal selesai PKL" required></div>
+    <datalist id="institutionOptions">
+      {% for name in institution_names %}
+      <option value="{{ name }}">
+      {% endfor %}
+    </datalist>
+    <div class="col-lg-2">
+      <select class="form-select" name="user_id" required>
+        {% for user in users %}
+        <option value="{{ user.id }}">{{ user.username }}</option>
+        {% else %}
+        <option value="">Belum ada akun peserta</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-lg-2"><button class="btn btn-primary w-100">Simpan</button></div>
+  </form>
+</section>
+
+<section class="panel-card">
+  <h5>Daftar Peserta</h5>
+  <div class="table-responsive mt-2">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Nama</th>
+          <th>Jurusan</th>
+          <th>Instansi</th>
+          <th>Periode PKL</th>
+          {% if can_manage_password %}<th>Akun</th><th>Kontrol Password</th><th>Sesi</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for participant in participants %}
+        <tr>
+          <td>{{ participant.id }}</td>
+          <td>
+            {{ participant.nama_lengkap }}
+            {% if participant.user %}
+            <br>
+            <button class="btn btn-sm btn-outline-primary mt-1" type="button" data-bs-toggle="collapse" data-bs-target="#editParticipant{{ participant.id }}" aria-expanded="false">Edit Profil</button>
+            <a href="/api/reports/peserta/{{ participant.user.id }}/pdf" class="btn btn-sm btn-outline-secondary mt-1" target="_blank">Laporan</a>
+            <a href="/api/reports/peserta/{{ participant.user.id }}/sertifikat" class="btn btn-sm btn-outline-success mt-1" target="_blank">Sertifikat</a>
+            <div class="collapse mt-2" id="editParticipant{{ participant.id }}">
+              <form method="post" action="/participants/{{ participant.id }}/edit" class="d-flex flex-column gap-1 p-2 rounded border bg-body-tertiary">
+                <input class="form-control form-control-sm" name="nama_lengkap" value="{{ participant.nama_lengkap }}" placeholder="Nama lengkap" required>
+                <input class="form-control form-control-sm" name="jurusan" value="{{ participant.jurusan or '' }}" placeholder="Jurusan">
+                <input class="form-control form-control-sm" name="instansi" value="{{ participant.instansi or '' }}" placeholder="Instansi" list="institutionOptions">
+                <button class="btn btn-sm btn-primary" type="submit">Simpan Profil</button>
+              </form>
+            </div>
+            {% endif %}
+          </td>          <td>{{ participant.jurusan or '-' }}</td>
+          <td>{{ participant.instansi or '-' }}</td>
+          <td>
+            {% if participant.tanggal_mulai and participant.tanggal_selesai %}
+              <small class="d-block text-muted">{{ participant.tanggal_mulai.strftime('%d/%m/%Y') }} – {{ participant.tanggal_selesai.strftime('%d/%m/%Y') }}</small>
+            {% else %}
+              <small class="text-muted">Belum diset</small>
+            {% endif %}
+            {% if can_manage_password %}
+            <form method="post" action="/participants/{{ participant.id }}/pkl-dates" class="d-flex gap-1 mt-1">
+              <input class="form-control form-control-sm" type="date" name="tanggal_mulai" value="{{ participant.tanggal_mulai.strftime('%Y-%m-%d') if participant.tanggal_mulai else '' }}">
+              <input class="form-control form-control-sm" type="date" name="tanggal_selesai" value="{{ participant.tanggal_selesai.strftime('%Y-%m-%d') if participant.tanggal_selesai else '' }}">
+              <button class="btn btn-sm btn-outline-success" type="submit">Set</button>
+            </form>
+            {% endif %}
+          </td>
+          {% if can_manage_password %}
+          <td>{{ participant.user.username if participant.user else '-' }}</td>
+          <td>
+            {% if participant.user %}
+            <form method="post" action="/users/{{ participant.user.id }}/password" class="d-flex flex-column flex-md-row gap-2">
+              <input type="hidden" name="redirect_to" value="/participants">
+              <input class="form-control form-control-sm" type="password" name="new_password" minlength="6" placeholder="Password baru" required>
+              <button class="btn btn-sm btn-outline-primary" type="submit">Ubah</button>
+            </form>
+            {% else %}
+            <span class="text-muted small">Akun tidak terhubung</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if participant.user %}
+            <form method="post" action="/users/{{ participant.user.id }}/force-logout">
+              <input type="hidden" name="redirect_to" value="/participants">
+              <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Logout semua sesi?')">Force Logout</button>
+            </form>
+            <form method="post" action="/users/{{ participant.user.id }}/soft-delete" class="mt-1">
+              <input type="hidden" name="redirect_to" value="/participants">
+              <button class="btn btn-sm btn-danger" type="submit" onclick="return confirm('Nonaktifkan akun ini?')">Nonaktifkan</button>
+            </form>
+            <form method="post" action="/users/{{ participant.user.id }}/delete" class="mt-1">
+              <input type="hidden" name="redirect_to" value="/participants">
+              <input type="hidden" name="confirmation" value="HAPUS">
+              <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Hapus permanen akun dan seluruh data peserta ini? Tindakan tidak dapat dibatalkan.')">Hapus Permanen</button>
+            </form>
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="{{ 8 if can_manage_password else 5 }}" class="text-center">
+            <div class="empty-state py-2">
+              <p class="mb-1 fw-semibold">Belum ada data peserta.</p>
+              <small class="text-muted">Tambahkan peserta baru dari formulir di atas agar modul absensi, jurnal, dan penilaian dapat digunakan.</small>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pagination(current_page, total_pages, base_url) }}
+</section>
+{% endblock %}

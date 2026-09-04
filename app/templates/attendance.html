@@ -1,53 +1,351 @@
-<!doctype html>
-<html lang="id">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Absensi - Monitoring PKL</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  </head>
-  <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-      <div class="container">
-        <a class="navbar-brand" href="/dashboard">Monitoring PKL</a>
+{% extends "layout.html" %}
+{% from '_pagination.html' import pagination %}
+{% block title %}Absensi - Monitoring PKL{% endblock %}
+{% block page_title %}{{ attendance_page_title }}{% endblock %}
+
+{% block content %}
+{% set attendance_stats = namespace(hadir=0, terlambat=0, izin=0, other=0) %}
+{% for item in attendance %}
+  {% set status = (item.status or '')|lower %}
+  {% if status == 'hadir' %}
+    {% set attendance_stats.hadir = attendance_stats.hadir + 1 %}
+  {% elif status == 'terlambat' %}
+    {% set attendance_stats.terlambat = attendance_stats.terlambat + 1 %}
+  {% elif status == 'izin' %}
+    {% set attendance_stats.izin = attendance_stats.izin + 1 %}
+  {% else %}
+    {% set attendance_stats.other = attendance_stats.other + 1 %}
+  {% endif %}
+{% endfor %}
+
+<section class="panel-card page-hero page-hero-attendance mb-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+    <div class="hero-title-wrap">
+      <span class="hero-glyph" aria-hidden="true">
+        <svg viewBox="0 0 24 24" role="img" focusable="false" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+          <path d="M8 3v4"></path>
+          <path d="M16 3v4"></path>
+          <path d="M3 10h18"></path>
+          <path d="M10 15l2 2 4-4"></path>
+        </svg>
+      </span>
+      <div>
+      <h5 class="mb-0">{{ attendance_page_title }}</h5>
       </div>
-    </nav>
-    <div class="container py-4">
-      <h2 class="mb-4">Absensi</h2>
-      <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body">
-          <h5>Catat Absensi</h5>
-          <form method="post" class="row g-2">
-            <div class="col-md-4">
-              <select class="form-select" name="user_id">
-                {% for user in users %}
-                <option value="{{ user.id }}">{{ user.username }}</option>
-                {% endfor %}
-              </select>
+    </div>
+    <span class="summary-badge">{{ attendance|length }} data</span>
+  </div>
+  <div class="row g-2 mt-2 mini-metric-row">
+    <div class="col-sm-3">
+      <div class="mini-metric mini-metric-high">
+        <span class="mini-metric-label">Hadir</span>
+        <strong class="mini-metric-value">{{ attendance_stats.hadir }}</strong>
+      </div>
+    </div>
+    <div class="col-sm-3">
+      <div class="mini-metric mini-metric-low">
+        <span class="mini-metric-label">Terlambat</span>
+        <strong class="mini-metric-value">{{ attendance_stats.terlambat }}</strong>
+      </div>
+    </div>
+    <div class="col-sm-3">
+      <div class="mini-metric mini-metric-mid">
+        <span class="mini-metric-label">Izin</span>
+        <strong class="mini-metric-value">{{ attendance_stats.izin }}</strong>
+      </div>
+    </div>
+    <div class="col-sm-3">
+      <div class="mini-metric mini-metric-neutral">
+        <span class="mini-metric-label">Lainnya</span>
+        <strong class="mini-metric-value">{{ attendance_stats.other }}</strong>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% if show_face_panel %}
+<section
+  class="panel-card mb-3 panel-elevated attendance-face-panel"
+  data-success-auto-hide-seconds="{{ attendance_ui_config.success_auto_hide_seconds if attendance_ui_config else 9 }}"
+  data-transition-style="{{ attendance_ui_config.transition_style if attendance_ui_config else 'normal' }}"
+>
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+    <div>
+      <h5 class="mb-1">Absensi Verifikasi Wajah</h5>
+      <p class="text-muted mb-0 attendance-guide-lead">Ikuti instruksi visual di panel ini. Sistem akan memandu dari kamera aktif, fokus wajah, liveness, sampai verifikasi berhasil.</p>
+    </div>
+    <span id="faceStageBadge" class="face-stage-badge stage-idle">Siap</span>
+  </div>
+  {% if just_registered %}
+  <div class="alert alert-success small mb-3" role="alert">
+    Registrasi wajah berhasil disimpan. Sekarang tombol <strong>Check-in</strong> dan <strong>Check-out</strong> sudah aktif, silakan lanjutkan absensi.
+  </div>
+  {% endif %}
+  <div class="row g-3 align-items-start">
+    <div class="col-lg-5">
+      <div class="attendance-camera-shell" id="attendanceCameraShell" data-guide-stage="idle">
+        <video id="cameraPreview" class="camera-preview w-100" autoplay playsinline muted></video>
+        <div class="camera-guide-overlay" aria-hidden="true">
+          <p class="camera-guide-label" id="cameraGuideLabel">Posisikan wajah di dalam bingkai oval</p>
+          <div class="camera-focus-ring-wrap"><div class="camera-focus-ring"></div></div>
+          <div class="camera-scan-line"></div>
+          <div class="camera-corner camera-corner-tl"></div>
+          <div class="camera-corner camera-corner-tr"></div>
+          <div class="camera-corner camera-corner-bl"></div>
+          <div class="camera-corner camera-corner-br"></div>
+          <div class="camera-idle-prompt" id="cameraIdlePrompt">
+            <button type="button" class="btn btn-light btn-sm" id="btnStartCamera">Aktifkan Kamera</button>
+            <span>Kamera belum aktif</span>
+          </div>
+          <div id="faceCountdownOverlay" class="face-countdown-overlay d-none">
+            <span id="faceCountdownValue" class="face-countdown-value">3</span>
+          </div>
+        </div>
+        <div id="faceSuccessTransition" class="face-success-transition d-none" aria-live="polite">
+          <div class="face-success-transition-inner">
+            <div class="face-success-loader" id="faceSuccessLoader"></div>
+            <div class="face-success-checkmark d-none" id="faceSuccessCheckmark" aria-hidden="true">
+              <svg viewBox="0 0 52 52">
+                <circle class="path circle" cx="26" cy="26" r="24" fill="none"></circle>
+                <path class="path check" fill="none" d="M14 27l8 8 16-16"></path>
+              </svg>
             </div>
-            <div class="col-md-4">
-              <select class="form-select" name="status">
-                <option value="hadir">Hadir</option>
-                <option value="terlambat">Terlambat</option>
-                <option value="izin">Izin</option>
-              </select>
-            </div>
-            <div class="col-md-4"><button class="btn btn-primary w-100">Simpan</button></div>
-          </form>
+            <p class="face-success-transition-title" id="faceSuccessTransitionTitle">Memproses verifikasi absensi...</p>
+            <p class="face-success-transition-sub" id="faceSuccessTransitionSub">Mohon tunggu, sistem sedang menyimpan hasil absensi.</p>
+          </div>
+        </div>
+        <div class="camera-live-caption">
+          <span class="camera-live-dot"></span>
+          <span>Mode panduan aktif</span>
         </div>
       </div>
-      <div class="card shadow-sm border-0">
-        <div class="card-body">
-          <table class="table table-striped">
-            <thead><tr><th>#</th><th>User</th><th>Status</th></tr></thead>
-            <tbody>
-              {% for item in attendance %}
-              <tr><td>{{ item.id }}</td><td>{{ item.user_id }}</td><td>{{ item.status }}</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
+      <canvas id="captureCanvas" class="d-none"></canvas>
+    </div>
+    <div class="col-lg-7">
+      <div class="face-command-card mb-3" id="faceCommandCard">
+        <p class="face-command-kicker mb-1">Panduan Absensi</p>
+        <h6 id="faceCommandHeadline" class="face-command-headline mb-1">Aktifkan kamera untuk mulai absensi.</h6>
+        <p id="faceCommandSubtext" class="face-command-subtext mb-0">Pastikan wajah terlihat jelas, pencahayaan cukup, dan kamera berada setinggi mata.</p>
+      </div>
+
+      <div class="face-how-it-works mb-3" id="faceHowItWorks">
+        <p class="face-how-title mb-2">Cara Kerja Absensi Wajah</p>
+        <div class="face-how-steps">
+          <div class="face-how-step"><strong>1.</strong> Aktifkan kamera dan posisikan wajah di bingkai panduan.</div>
+          <div class="face-how-step"><strong>2.</strong> Ikuti instruksi liveness (kedip atau gerakkan kepala sedikit).</div>
+          <div class="face-how-step"><strong>3.</strong> Sistem membandingkan wajah dengan data terdaftar.</div>
+          <div class="face-how-step"><strong>4.</strong> Jika cocok, absensi tersimpan dan status berhasil ditampilkan.</div>
+        </div>
+      </div>
+
+      <div class="face-step-grid mb-3" id="faceStepGrid">
+        <div class="face-step-chip is-active" data-face-step="camera">
+          <span class="face-step-index">1</span>
+          <span class="face-step-copy">Aktifkan kamera</span>
+        </div>
+        <div class="face-step-chip" data-face-step="position">
+          <span class="face-step-index">2</span>
+          <span class="face-step-copy">Posisikan wajah</span>
+        </div>
+        <div class="face-step-chip" data-face-step="liveness">
+          <span class="face-step-index">3</span>
+          <span class="face-step-copy">Ikuti gerakan</span>
+        </div>
+        <div class="face-step-chip" data-face-step="verify">
+          <span class="face-step-index">4</span>
+          <span class="face-step-copy">Verifikasi absen</span>
+        </div>
+      </div>
+
+      <div class="face-quality-panel mb-3">
+        <div class="face-quality-head d-flex justify-content-between align-items-center gap-2 flex-wrap">
+          <span class="face-quality-title">Kesiapan Kamera</span>
+          <label class="face-voice-toggle">
+            <input type="checkbox" id="voiceGuideToggle" checked>
+            <span>Voice cue</span>
+          </label>
+        </div>
+        <div class="face-quality-grid mt-2">
+          <div id="qualityBrightness" class="face-quality-chip state-wait">Cahaya: menunggu kamera</div>
+          <div id="qualityFraming" class="face-quality-chip state-wait">Framing: siapkan wajah di tengah</div>
+          <div id="qualityStability" class="face-quality-chip state-wait">Stabilitas: tahan posisi sejenak</div>
+        </div>
+        <p class="small text-muted mb-0 mt-2">GPS wajib aktif. Radius utama {{ attendance_ui_config.office_radius_m if attendance_ui_config else 200 }}m, grace {{ attendance_ui_config.office_grace_m if attendance_ui_config else 15 }}m (masuk review), dan akurasi maksimal {{ attendance_ui_config.office_max_accuracy_m if attendance_ui_config else 80 }}m.</p>
+        <p class="small text-muted mb-0 mt-1">Sumber geofence: {% if attendance_ui_config and attendance_ui_config.office_policy_source == 'institution' %}instansi {{ attendance_ui_config.office_institution_name or '' }}{% else %}global kantor{% endif %}.</p>
+      </div>
+
+      <div class="face-step-section mb-2" id="faceRegisterSection">
+        <p class="face-step-section-title mb-1">Langkah 1 — Registrasi Wajah <span class="text-muted fw-normal">(sekali di awal, ulangi jika wajah berubah)</span></p>
+        <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
+          <div class="face-registered-photo-wrap" id="faceRegisteredPhotoWrap">
+            <img id="faceRegisteredPhoto" class="face-registered-photo d-none" alt="Foto wajah terdaftar">
+            <div class="face-registered-photo-placeholder" id="faceRegisteredPhotoPlaceholder">Belum ada foto</div>
+          </div>
+          <div class="d-flex flex-wrap gap-2 face-action-wrap">
+            <button type="button" class="btn btn-primary" id="btnRegisterFace">{{ 'Update Registrasi Wajah' if has_face_registered else 'Registrasi Wajah' }}</button>
+          </div>
+        </div>
+        {% if has_face_registered %}
+        <p class="small text-success mb-0">Wajah Anda sudah terdaftar. Silakan lanjut ke Langkah 2 untuk absensi.</p>
+        {% else %}
+        <p class="small text-warning mb-0">Wajah belum terdaftar. Selesaikan langkah ini dulu sebelum bisa absen.</p>
+        {% endif %}
+      </div>
+
+      <div class="face-step-section mb-2" id="faceAttendanceSection">
+        <p class="face-step-section-title mb-1">Langkah 2 — Absensi Harian (Check-in / Check-out)</p>
+        <div class="d-flex flex-wrap gap-2 mb-2 face-action-wrap">
+          <button type="button" class="btn btn-success" id="btnCheckinFace" {% if not has_face_registered %}disabled title="Registrasi wajah dulu sebelum bisa check-in"{% endif %}>Check-in Wajah</button>
+          <button type="button" class="btn btn-warning" id="btnCheckoutFace" {% if not has_face_registered %}disabled title="Registrasi wajah dulu sebelum bisa check-out"{% endif %}>Check-out Wajah</button>
+        </div>
+      </div>
+      <div id="faceResult" class="alert alert-secondary small mb-0">Kamera belum aktif.</div>
+
+      <div id="faceSuccessEnding" class="face-success-ending d-none mt-2" aria-live="polite">
+        <div class="face-success-head">
+          <span class="face-success-icon" aria-hidden="true">✓</span>
+          <div>
+            <p class="face-success-title mb-0" id="faceSuccessTitle">Berhasil</p>
+            <p class="face-success-sub mb-0" id="faceSuccessDetail">Data sudah terekam dengan aman.</p>
+          </div>
+        </div>
+        <div class="face-success-rail mt-3" id="faceSuccessRail">
+          <div class="face-success-rail-step" data-success-rail-step="camera">Kamera</div>
+          <div class="face-success-rail-step" data-success-rail-step="liveness">Liveness</div>
+          <div class="face-success-rail-step" data-success-rail-step="verify">Verifikasi</div>
+          <div class="face-success-rail-step" data-success-rail-step="done">Selesai</div>
+        </div>
+        <div class="face-success-meta mt-2">
+          <span id="faceSuccessAction">Aksi: -</span>
+          <span id="faceSuccessTime">Waktu: -</span>
+          <span id="faceSuccessAutoHide">Panel ini menutup otomatis dalam beberapa detik.</span>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+          <button type="button" class="btn btn-success" id="btnFaceFinish">Selesai</button>
+          <button type="button" class="btn btn-outline-secondary" id="btnFaceReload">Muat Ulang Riwayat</button>
+        </div>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-success d-none mt-2" id="btnFaceShowEnding">Tampilkan Ringkasan Absensi Terakhir</button>
+
+      <div id="livenessHint" class="liveness-hint d-none mt-2" aria-live="polite">
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="12" rx="10" ry="6"/><circle cx="12" cy="12" r="3"/></svg>
+          <span id="livenessHintText" class="fw-semibold small">Kedipkan mata atau gerakkan kepala sedikit…</span>
+        </div>
+        <div class="liveness-progress-wrap">
+          <div id="livenessProgressBar" class="liveness-progress-fill" style="width:0%"></div>
         </div>
       </div>
     </div>
-  </body>
-</html>
+  </div>
+</section>
+{% endif %}
+
+{% if can_manage_attendance %}
+<section class="panel-card mb-3 panel-elevated">
+  <h5>Absensi Manual</h5>
+  <form id="manualAttendanceForm" method="post" class="row g-2 mt-1">
+    <div class="col-lg-4">
+      <select class="form-select" name="user_id" required>
+        {% for user in users %}
+        <option value="{{ user.id }}">{{ user.username }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-lg-4">
+      <select class="form-select" name="status" required>
+        <option value="hadir">Hadir</option>
+        <option value="terlambat">Terlambat</option>
+        <option value="izin">Izin</option>
+      </select>
+    </div>
+    <div class="col-lg-4"><button class="btn btn-primary w-100">Simpan</button></div>
+  </form>
+</section>
+{% endif %}
+
+<section class="panel-card panel-elevated">
+  <h5>Riwayat Absensi</h5>
+  {% if can_manage_attendance %}
+  <div class="d-flex flex-wrap gap-2 mt-2 mb-2">
+    <a href="/attendance" class="btn btn-sm {% if review_filter == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">Semua</a>
+    <a href="/attendance?review_filter=pending" class="btn btn-sm {% if review_filter == 'pending' %}btn-warning{% else %}btn-outline-warning{% endif %}">Review Pending</a>
+    <a href="/attendance?review_filter=approved" class="btn btn-sm {% if review_filter == 'approved' %}btn-success{% else %}btn-outline-success{% endif %}">Review Approved</a>
+    <a href="/attendance?review_filter=rejected" class="btn btn-sm {% if review_filter == 'rejected' %}btn-danger{% else %}btn-outline-danger{% endif %}">Review Rejected</a>
+    <a href="/attendance?review_filter=grace" class="btn btn-sm {% if review_filter == 'grace' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">Alasan Grace</a>
+    <a href="/attendance?review_filter=risk" class="btn btn-sm {% if review_filter == 'risk' %}btn-dark{% else %}btn-outline-dark{% endif %}">Alasan Anomali</a>
+  </div>
+  {% endif %}
+  <div class="table-responsive mt-2">
+    <table class="table table-hover align-middle attendance-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          {% if can_manage_attendance %}<th>Pengguna</th>{% endif %}
+          <th>Tanggal</th>
+          <th>Check-in</th>
+          <th>Check-out</th>
+          <th>Status</th>
+          {% if can_manage_attendance %}<th>Review Lokasi</th><th>Aksi Review</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in attendance %}
+        {% set status = (item.status or '')|lower %}
+        <tr>
+          <td>{{ item.id }}</td>
+          {% if can_manage_attendance %}<td>{{ item.user.username if item.user else ('User ' ~ item.user_id) }}</td>{% endif %}
+          <td>{{ item.attendance_date.strftime('%d/%m/%Y') if item.attendance_date else '-' }}</td>
+          <td>{{ item.check_in_time.strftime('%H:%M') if item.check_in_time else '-' }}</td>
+          <td>{{ item.check_out_time.strftime('%H:%M') if item.check_out_time else '-' }}</td>
+          <td>
+            <span class="badge text-bg-light border text-capitalize attendance-status-pill {% if status == 'hadir' %}status-pill-high{% elif status == 'izin' %}status-pill-mid{% elif status == 'terlambat' %}status-pill-low{% else %}status-pill-neutral{% endif %}">
+              {{ item.status }}
+            </span>
+          </td>
+          {% if can_manage_attendance %}
+          <td>
+            {% set review_status = item.location_review_status or ('pending' if item.requires_location_review else 'not_required') %}
+            {% set review_reason = item.location_review_reason or '-' %}
+            <div class="d-flex flex-column gap-1">
+              <span class="badge {% if review_status == 'approved' %}text-bg-success{% elif review_status == 'rejected' %}text-bg-danger{% elif review_status == 'pending' %}text-bg-warning{% else %}text-bg-light border{% endif %}">
+                {{ review_status }}
+              </span>
+              <span class="badge {% if review_reason == 'grace' %}text-bg-secondary{% elif review_reason == 'risk' %}text-bg-dark{% elif review_reason == 'grace_and_risk' %}text-bg-primary{% else %}text-bg-light border{% endif %}">
+                {{ review_reason }}
+              </span>
+              {% if item.location_review_note %}
+              <small class="text-muted">{{ item.location_review_note[:80] }}{% if item.location_review_note|length > 80 %}...{% endif %}</small>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            {% if item.requires_location_review %}
+            <form method="post" action="/attendance/{{ item.id }}/location-review" class="d-flex flex-column gap-1">
+              <input type="text" class="form-control form-control-sm" name="note" placeholder="Catatan review (opsional)">
+              <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-outline-success" type="submit" name="decision" value="approved">Approve</button>
+                <button class="btn btn-sm btn-outline-danger" type="submit" name="decision" value="rejected">Reject</button>
+                <button class="btn btn-sm btn-outline-secondary" type="submit" name="decision" value="reset">Reset</button>
+              </div>
+            </form>
+            {% else %}
+            <span class="text-muted small">Tidak perlu review</span>
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="{{ 8 if can_manage_attendance else 5 }}" class="text-center text-muted">Belum ada data absensi.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pagination(current_page, total_pages, base_url) }}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/attendance.js') }}"></script>
+{% endblock %}

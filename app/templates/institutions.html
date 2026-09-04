@@ -1,42 +1,223 @@
-<!doctype html>
-<html lang="id">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Instansi - Monitoring PKL</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  </head>
-  <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-      <div class="container">
-        <a class="navbar-brand" href="/dashboard">Monitoring PKL</a>
-      </div>
-    </nav>
-    <div class="container py-4">
-      <h2 class="mb-4">Data Instansi</h2>
-      <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body">
-          <h5>Tambah Instansi</h5>
-          <form method="post" class="row g-2">
-            <div class="col-md-4"><input class="form-control" name="nama_instansi" placeholder="Nama instansi" required></div>
-            <div class="col-md-4"><input class="form-control" name="alamat" placeholder="Alamat"></div>
-            <div class="col-md-2"><input class="form-control" name="kontak" placeholder="Kontak"></div>
-            <div class="col-md-2"><button class="btn btn-primary w-100">Simpan</button></div>
-          </form>
-        </div>
-      </div>
-      <div class="card shadow-sm border-0">
-        <div class="card-body">
-          <table class="table table-striped">
-            <thead><tr><th>#</th><th>Nama Instansi</th><th>Alamat</th><th>Kontak</th></tr></thead>
-            <tbody>
-              {% for institution in institutions %}
-              <tr><td>{{ institution.id }}</td><td>{{ institution.nama_instansi }}</td><td>{{ institution.alamat }}</td><td>{{ institution.kontak }}</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
+{% extends "layout.html" %}
+
+{% block title %}Instansi - Monitoring PKL{% endblock %}
+{% block page_title %}Manajemen Instansi{% endblock %}
+
+{% block content %}
+<section class="panel-card mb-3 context-banner">
+  <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 align-items-start align-items-lg-center">
+    <div>
+      <p class="summary-kicker mb-1 text-uppercase">Akses {{ current_user.role if current_user else 'guest' }}</p>
+      <h5 class="mb-1">Ruang Kelola Instansi Mitra</h5>
+      <p class="text-muted mb-0">Data instansi menjadi dasar penempatan peserta dan pelaporan kegiatan PKL lintas unit.</p>
     </div>
-  </body>
-</html>
+    <span class="badge rounded-pill summary-badge">Role: {{ current_user.role if current_user else 'guest' }}</span>
+  </div>
+</section>
+
+<section class="panel-card mb-3">
+  <h5>Geofence Default (Kantor Pusat)</h5>
+  <p class="text-muted small mb-2">Titik ini dipakai sebagai fallback kalau instansi peserta belum punya geofence sendiri di tabel bawah.</p>
+  <form method="post" action="/admin/office-geofence" class="row g-2 align-items-end" id="defaultGeofenceForm">
+    <div class="col-sm-6 col-lg-3">
+      <label class="form-label small text-uppercase fw-semibold">Latitude</label>
+      <input type="number" step="0.0000001" class="form-control geo-lat-input" name="office_latitude" value="{{ default_geofence.office_latitude }}" placeholder="contoh: -6.2023090" required>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <label class="form-label small text-uppercase fw-semibold">Longitude</label>
+      <input type="number" step="0.0000001" class="form-control geo-lng-input" name="office_longitude" value="{{ default_geofence.office_longitude }}" placeholder="contoh: 106.8168950" required>
+    </div>
+    <div class="col-sm-4 col-lg-2">
+      <label class="form-label small text-uppercase fw-semibold">Radius (m)</label>
+      <input type="number" min="20" max="5000" class="form-control" name="office_radius_m" value="{{ default_geofence.office_radius_m }}" required>
+    </div>
+    <div class="col-sm-4 col-lg-2">
+      <label class="form-label small text-uppercase fw-semibold">Grace (m)</label>
+      <input type="number" min="0" max="500" class="form-control" name="office_grace_m" value="{{ default_geofence.office_grace_m }}" required>
+    </div>
+    <div class="col-sm-4 col-lg-2">
+      <label class="form-label small text-uppercase fw-semibold">Maks Akurasi (m)</label>
+      <input type="number" min="10" max="500" class="form-control" name="office_max_accuracy_m" value="{{ default_geofence.office_max_accuracy_m }}" required>
+    </div>
+    <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
+      <button type="button" class="btn btn-outline-secondary btn-sm geo-fill-btn">Ambil Lokasi Saat Ini</button>
+      <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm disabled geo-maps-btn" aria-disabled="true">Cek di Google Maps</a>
+      <button type="button" class="btn btn-outline-dark btn-sm geo-copy-btn">Salin Koordinat</button>
+      <span class="small text-muted geo-status-text">Klik untuk isi otomatis dari GPS perangkat.</span>
+      <button type="submit" class="btn btn-primary btn-sm ms-auto">Simpan Geofence Default</button>
+    </div>
+  </form>
+</section>
+
+<section class="panel-card mb-3">
+  <h5>Tambah Instansi</h5>
+  <form method="post" class="row g-2 mt-1" id="newInstitutionForm">
+    <div class="col-lg-3"><input class="form-control" name="nama_instansi" placeholder="Nama instansi" required></div>
+    <div class="col-lg-3"><input class="form-control" name="alamat" placeholder="Alamat"></div>
+    <div class="col-lg-2"><input class="form-control" name="kontak" placeholder="Kontak"></div>
+    <div class="col-lg-2"><input class="form-control geo-lat-input" name="office_latitude" placeholder="Latitude GPS"></div>
+    <div class="col-lg-2"><input class="form-control geo-lng-input" name="office_longitude" placeholder="Longitude GPS"></div>
+    <div class="col-lg-2"><input class="form-control" type="number" min="20" max="5000" name="office_radius_m" placeholder="Radius m"></div>
+    <div class="col-lg-2"><input class="form-control" type="number" min="0" max="500" name="office_grace_m" placeholder="Grace m"></div>
+    <div class="col-lg-2"><input class="form-control" type="number" min="10" max="500" name="office_max_accuracy_m" placeholder="Akurasi max m"></div>
+    <div class="col-lg-2"><button type="button" class="btn btn-outline-secondary w-100 geo-fill-btn">Ambil Lokasi Saat Ini</button></div>
+    <div class="col-lg-2"><button class="btn btn-primary w-100">Simpan</button></div>
+  </form>
+</section>
+
+<section class="panel-card">
+  <h5>Daftar Instansi</h5>
+  <div class="table-responsive mt-2">
+    <table class="table table-hover align-middle">
+      <thead><tr><th>#</th><th>Nama Instansi</th><th>Alamat</th><th>Kontak</th><th>Geofence</th></tr></thead>
+      <tbody>
+        {% for institution in institutions %}
+        <tr>
+          <td>{{ institution.id }}</td>
+          <td>{{ institution.nama_instansi }}</td>
+          <td>{{ institution.alamat or '-' }}</td>
+          <td>{{ institution.kontak or '-' }}</td>
+          <td>
+            <form method="post" action="/institutions/{{ institution.id }}/geofence" class="row g-1">
+              <div class="col-12 small text-muted mb-1">
+                {% if institution.office_latitude is not none and institution.office_longitude is not none and institution.office_radius_m is not none %}
+                Aktif: {{ institution.office_latitude }}, {{ institution.office_longitude }} | R {{ institution.office_radius_m }}m | G {{ institution.office_grace_m or 0 }}m | A {{ institution.office_max_accuracy_m or '-' }}m
+                {% else %}
+                Belum ada geofence khusus instansi.
+                {% endif %}
+              </div>
+              <div class="col-md-6"><input class="form-control form-control-sm geo-lat-input" name="office_latitude" value="{{ institution.office_latitude if institution.office_latitude is not none else '' }}" placeholder="Latitude"></div>
+              <div class="col-md-6"><input class="form-control form-control-sm geo-lng-input" name="office_longitude" value="{{ institution.office_longitude if institution.office_longitude is not none else '' }}" placeholder="Longitude"></div>
+              <div class="col-md-4"><input class="form-control form-control-sm" type="number" min="20" max="5000" name="office_radius_m" value="{{ institution.office_radius_m if institution.office_radius_m is not none else '' }}" placeholder="Radius"></div>
+              <div class="col-md-4"><input class="form-control form-control-sm" type="number" min="0" max="500" name="office_grace_m" value="{{ institution.office_grace_m if institution.office_grace_m is not none else '' }}" placeholder="Grace"></div>
+              <div class="col-md-4"><input class="form-control form-control-sm" type="number" min="10" max="500" name="office_max_accuracy_m" value="{{ institution.office_max_accuracy_m if institution.office_max_accuracy_m is not none else '' }}" placeholder="Akurasi"></div>
+              <div class="col-12 d-flex flex-wrap gap-1 justify-content-between mt-1">
+                <div class="d-flex flex-wrap gap-1">
+                  <button class="btn btn-sm btn-outline-secondary geo-fill-btn" type="button">Ambil Lokasi Saat Ini</button>
+                  <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary disabled geo-maps-btn" aria-disabled="true">Cek Maps</a>
+                  <button class="btn btn-sm btn-outline-dark geo-copy-btn" type="button">Salin</button>
+                </div>
+                <button class="btn btn-sm btn-outline-primary" type="submit">Update Geofence</button>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="text-center">
+            <div class="empty-state py-2">
+              <p class="mb-1 fw-semibold">Belum ada data instansi.</p>
+              <small class="text-muted">Tambahkan instansi mitra agar data peserta memiliki referensi unit penempatan yang valid.</small>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function updateMapsBtn(form) {
+    const mapsBtn = form.querySelector(".geo-maps-btn");
+    if (!mapsBtn) return;
+    const lat = parseFloat(form.querySelector(".geo-lat-input").value);
+    const lng = parseFloat(form.querySelector(".geo-lng-input").value);
+    const valid = Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+    if (!valid) {
+      mapsBtn.href = "#";
+      mapsBtn.classList.add("disabled");
+      mapsBtn.setAttribute("aria-disabled", "true");
+      return;
+    }
+    mapsBtn.href = "https://www.google.com/maps?q=" + lat.toFixed(7) + "," + lng.toFixed(7);
+    mapsBtn.classList.remove("disabled");
+    mapsBtn.setAttribute("aria-disabled", "false");
+  }
+
+  document.querySelectorAll(".geo-lat-input, .geo-lng-input").forEach(function (input) {
+    const form = input.closest("form");
+    if (form) {
+      updateMapsBtn(form);
+      input.addEventListener("input", () => updateMapsBtn(form));
+    }
+  });
+
+  document.querySelectorAll(".geo-fill-btn").forEach(function (btn) {
+    if (!navigator.geolocation) {
+      btn.disabled = true;
+      btn.title = "Browser tidak mendukung geolocation";
+      return;
+    }
+    btn.addEventListener("click", function () {
+      const form = btn.closest("form");
+      const latInput = form.querySelector(".geo-lat-input");
+      const lngInput = form.querySelector(".geo-lng-input");
+      btn.disabled = true;
+      const originalLabel = btn.textContent;
+      btn.textContent = "Mengambil lokasi...";
+      navigator.geolocation.getCurrentPosition(
+        function (position) {
+          latInput.value = position.coords.latitude.toFixed(7);
+          lngInput.value = position.coords.longitude.toFixed(7);
+          updateMapsBtn(form);
+          btn.textContent = "Lokasi terisi ✓";
+          setTimeout(() => { btn.textContent = originalLabel; btn.disabled = false; }, 1500);
+        },
+        function () {
+          btn.textContent = "Gagal ambil lokasi";
+          setTimeout(() => { btn.textContent = originalLabel; btn.disabled = false; }, 1500);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    });
+  });
+
+  document.querySelectorAll(".geo-maps-btn").forEach(function (btn) {
+    btn.addEventListener("click", function (event) {
+      if (btn.classList.contains("disabled")) {
+        event.preventDefault();
+        const originalLabel = btn.textContent;
+        btn.textContent = "Isi koordinat dulu";
+        setTimeout(() => { btn.textContent = originalLabel; }, 1500);
+      }
+    });
+  });
+
+  document.querySelectorAll(".geo-copy-btn").forEach(function (btn) {
+    btn.addEventListener("click", async function () {
+      const form = btn.closest("form");
+      const lat = parseFloat(form.querySelector(".geo-lat-input").value);
+      const lng = parseFloat(form.querySelector(".geo-lng-input").value);
+      const valid = Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+      const originalLabel = btn.textContent;
+      if (!valid) {
+        btn.textContent = "Isi koordinat dulu";
+        setTimeout(() => { btn.textContent = originalLabel; }, 1500);
+        return;
+      }
+      const text = lat.toFixed(7) + "," + lng.toFixed(7);
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const temp = document.createElement("textarea");
+          temp.value = text;
+          temp.style.position = "absolute";
+          temp.style.left = "-9999px";
+          document.body.appendChild(temp);
+          temp.select();
+          document.execCommand("copy");
+          document.body.removeChild(temp);
+        }
+        btn.textContent = "Tersalin ✓";
+      } catch (_err) {
+        btn.textContent = "Gagal salin";
+      }
+      setTimeout(() => { btn.textContent = originalLabel; }, 1500);
+    });
+  });
+</script>
+{% endblock %}

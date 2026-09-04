@@ -38,7 +38,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> dict[st
         username=payload.username,
         email=str(payload.email),
         password_hash=hash_password(payload.password),
-        role=payload.role,
+        role="peserta",
     )
     db.add(new_user)
     db.commit()

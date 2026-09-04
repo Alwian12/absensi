@@ -1,0 +1,21 @@
+{% macro pagination(current_page, total_pages, base_url) %}
+{% if total_pages > 1 %}
+{% set page_sep = '&' if '?' in base_url else '?' %}
+<nav class="pagination-wrap" aria-label="Navigasi halaman">
+   <a href="{{ base_url }}{{ page_sep }}page={{ [current_page - 1, 1] | max }}"
+     class="pagination-btn {% if current_page <= 1 %}disabled{% endif %}"
+     aria-label="Sebelumnya">‹</a>
+
+  {% for p in range([1, current_page - 2] | max, [total_pages + 1, current_page + 3] | min) %}
+      <a href="{{ base_url }}{{ page_sep }}page={{ p }}"
+       class="pagination-btn {% if p == current_page %}active{% endif %}">{{ p }}</a>
+  {% endfor %}
+
+   <a href="{{ base_url }}{{ page_sep }}page={{ [current_page + 1, total_pages] | min }}"
+     class="pagination-btn {% if current_page >= total_pages %}disabled{% endif %}"
+     aria-label="Berikutnya">›</a>
+
+  <span class="pagination-info">Halaman {{ current_page }} / {{ total_pages }}</span>
+</nav>
+{% endif %}
+{% endmacro %}
