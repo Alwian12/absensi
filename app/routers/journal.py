@@ -2,40 +2,16 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.authentication.jwt_handler import verify_token
-from app.database import SessionLocal
+from app.database import get_db
 from app.models.journal import Journal
 from app.models.user import User
+from app.security.session import require_user
 
 router = APIRouter(prefix="/api/journal", tags=["journal"])
 
 
-def get_db() -> Session:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
 def get_request_user(request: Request, db: Session, authorization: str | None = Header(default=None)) -> User:
-    if authorization and authorization.lower().startswith("bearer "):
-        token = authorization.split(" ", 1)[1].strip()
-        try:
-            payload = verify_token(token)
-            user_id = int(payload["sub"])
-            user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
-            if user:
-                return user
-        except Exception:
-            pass
-
-    raw_user_id = request.cookies.get("user_id")
-    if raw_user_id and raw_user_id.isdigit():
-        user = db.query(User).filter(User.id == int(raw_user_id), User.is_active == True).first()
-        if user:
-            return user
-
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    return require_user(request, db, authorization)
 
 
 @router.post("")

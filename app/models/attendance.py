@@ -16,6 +16,8 @@ class Attendance(Base):
     status = Column(String(50), nullable=False, default="hadir")
     confidence_score = Column(Float, nullable=True)
     alasan_pulang_cepat = Column(String(500), nullable=True)
+
+    # Check-in location
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     distance_from_office_m = Column(Float, nullable=True)
@@ -25,5 +27,14 @@ class Attendance(Base):
     location_review_note = Column(String(300), nullable=True)
     location_reviewed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     location_reviewed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Check-out location (Opsi B: dipisah agar koordinat check-in pagi tidak ditimpa saat pulang)
+    check_out_latitude = Column(Float, nullable=True)
+    check_out_longitude = Column(Float, nullable=True)
+    check_out_distance_m = Column(Float, nullable=True)
+    check_out_requires_location_review = Column(Boolean, nullable=False, default=False)
+    check_out_location_review_reason = Column(String(30), nullable=True)
+    check_out_location_review_status = Column(String(20), nullable=False, default="not_required")
+    check_out_location_review_note = Column(String(300), nullable=True)
 
     user = relationship("User", foreign_keys=[user_id])

@@ -1,149 +1,266 @@
 {% extends "layout.html" %}
 
-{% block title %}Pembimbing - Monitoring PKL{% endblock %}
-{% block page_title %}Manajemen Pembimbing{% endblock %}
+{% block title %}Manajemen Pembimbing - Monitoring PKL{% endblock %}
+{% block page_title %}Manajemen Pembimbing PKL{% endblock %}
 
 {% block content %}
+
+<datalist id="bidangOptions">
+  {% for b in bidang_options or [] %}
+  <option value="{{ b }}">
+  {% endfor %}
+</datalist>
 
 {% if users_without_profile %}
 <section class="panel-card mb-3" style="border-left:4px solid #f59e0b">
   <div class="d-flex justify-content-between align-items-center mb-2">
-    <h5 class="mb-0">Akun Pembimbing Belum Terhubung Profil</h5>
+    <h5 class="mb-0">Akun Pembimbing Belum Memiliki Profil</h5>
     <span class="badge text-bg-warning">{{ users_without_profile|length }} akun</span>
   </div>
-  <p class="text-muted small mb-2">Akun berikut sudah memiliki role pembimbing tapi belum dibuatkan profil pembimbing (nama, NIP, jabatan).</p>
+  <p class="text-muted small mb-2">Akun berikut sudah berstatus pembimbing tetapi belum dilengkapi profil (nama lengkap, NIP, jabatan, bidang). Klik untuk mengisi:</p>
   <div class="d-flex flex-wrap gap-2">
     {% for u in users_without_profile %}
-    <span class="badge px-3 py-2" style="background:#fffbeb;color:#92400e;border:1px solid #fde68a;font-size:.8rem">
-      {{ u.username }} — belum ada profil
-    </span>
+    <button type="button" class="btn btn-sm btn-warning"
+            onclick="document.getElementById('linkUserId').value='{{ u.id }}'; document.getElementById('linkNamaInput').focus();">
+      Lengkapi Profil: <strong>{{ u.username }}</strong> ({{ u.email }})
+    </button>
     {% endfor %}
   </div>
 </section>
 {% endif %}
 
-<section class="panel-card mb-3">
-  <h5>Buat Akun + Profil Pembimbing</h5>
-  <p class="text-muted small mb-2">Gunakan ini jika pembimbing belum memiliki akun. Akun dan profil dibuat sekaligus.</p>
-  <form method="post" action="/supervisors/create-account" class="row g-2 mt-1">
-    <div class="col-lg-3"><input class="form-control" name="nama_lengkap" placeholder="Nama lengkap" required></div>
-    <div class="col-lg-2"><input class="form-control" name="username" placeholder="Username" required autocomplete="off"></div>
-    <div class="col-lg-3"><input class="form-control" type="email" name="email" placeholder="Email" required autocomplete="off"></div>
-    <div class="col-lg-2"><input class="form-control" type="password" name="password" placeholder="Password" minlength="8" required autocomplete="new-password"></div>
-    <div class="col-lg-2"><input class="form-control" name="nip" placeholder="NIP"></div>
-    <div class="col-lg-2"><input class="form-control" name="jabatan" placeholder="Jabatan"></div>
-    <div class="col-lg-2"><input class="form-control" name="bidang" placeholder="Bidang (opsional)"></div>
-    <div class="col-lg-2"><button class="btn btn-primary w-100" type="submit">Buat Akun</button></div>
-  </form>
-</section>
+<div class="row g-3 mb-3">
+  <div class="col-lg-8">
+    <section class="panel-card h-100">
+      <h5>Buat Akun + Profil Pembimbing Baru</h5>
+      <p class="text-muted small mb-2">Hanya Admin yang dapat membuat dan mengelola data pembimbing serta penempatan bidangnya.</p>
+      <form method="post" action="/supervisors/create-account" class="row g-2 mt-1">
+        <div class="col-md-4">
+          <label class="form-label small fw-semibold mb-1">Nama Lengkap &amp; Gelar <span class="text-danger">*</span></label>
+          <input class="form-control form-control-sm" name="nama_lengkap" placeholder="Contoh: Budi Santoso, S.Kom" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-semibold mb-1">NIP</label>
+          <input class="form-control form-control-sm" name="nip" placeholder="1985xxxx...">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-semibold mb-1">Jabatan</label>
+          <input class="form-control form-control-sm" name="jabatan" placeholder="Contoh: Pranata Komputer">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small fw-semibold mb-1">Bidang Penugasan</label>
+          <input class="form-control form-control-sm" name="bidang" list="bidangOptions" placeholder="Aptika / IKP / Sekretariat">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small fw-semibold mb-1">Username Login <span class="text-danger">*</span></label>
+          <input class="form-control form-control-sm" name="username" placeholder="pembimbing_aptika" required autocomplete="off">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small fw-semibold mb-1">Email <span class="text-danger">*</span></label>
+          <input class="form-control form-control-sm" type="email" name="email" placeholder="email@instansi.go.id" required autocomplete="off">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small fw-semibold mb-1">Password Awal <span class="text-danger">*</span></label>
+          <input class="form-control form-control-sm" type="password" name="password" placeholder="Min. 8 karakter" minlength="8" required autocomplete="new-password">
+        </div>
+        <div class="col-12 d-flex justify-content-end mt-2">
+          <button class="btn btn-sm btn-primary px-4" type="submit">Buat Akun &amp; Simpan Pembimbing</button>
+        </div>
+      </form>
+    </section>
+  </div>
 
-<section class="panel-card mb-3">
-  <h5>Tambah Pembimbing</h5>
-  <p class="text-muted small mb-2">Gunakan ini hanya untuk menghubungkan akun pembimbing yang sudah ada.</p>
-  <form method="post" class="row g-2 mt-1">
-    <div class="col-lg-3"><input class="form-control" name="nama_lengkap" placeholder="Nama lengkap" required></div>
-    <div class="col-lg-2"><input class="form-control" name="nip" placeholder="NIP"></div>
-    <div class="col-lg-2"><input class="form-control" name="jabatan" placeholder="Jabatan"></div>
-    <div class="col-lg-1"><input class="form-control" name="bidang" placeholder="Bidang (opsional)"></div>
-    <div class="col-lg-2">
-      <select class="form-select" name="user_id" required>
-        {% for user in users %}
-        <option value="{{ user.id }}">{{ user.username }}</option>
-        {% else %}
-        <option value="">Belum ada akun pembimbing yang belum terhubung</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-lg-2"><button class="btn btn-primary w-100">Simpan</button></div>
-  </form>
-</section>
+  <div class="col-lg-4">
+    <section class="panel-card h-100">
+      <h5>Hubungkan Akun yang Sudah Ada</h5>
+      <p class="text-muted small mb-2">Gunakan jika akun user pembimbing sudah dibuat sebelumnya tetapi belum memiliki data profil.</p>
+      <form method="post" action="/supervisors" class="row g-2 mt-1">
+        <div class="col-12">
+          <select class="form-select form-select-sm" name="user_id" id="linkUserId" required>
+            {% for user in users %}
+            <option value="{{ user.id }}">{{ user.username }} ({{ user.email }})</option>
+            {% else %}
+            <option value="">Semua akun pembimbing sudah memiliki profil</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12">
+          <input class="form-control form-control-sm" name="nama_lengkap" id="linkNamaInput" placeholder="Nama lengkap & gelar" required>
+        </div>
+        <div class="col-6">
+          <input class="form-control form-control-sm" name="nip" placeholder="NIP">
+        </div>
+        <div class="col-6">
+          <input class="form-control form-control-sm" name="jabatan" placeholder="Jabatan">
+        </div>
+        <div class="col-8">
+          <input class="form-control form-control-sm" name="bidang" list="bidangOptions" placeholder="Bidang penugasan">
+        </div>
+        <div class="col-4">
+          <button class="btn btn-sm btn-outline-primary w-100" type="submit" {% if not users %}disabled{% endif %}>Simpan</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
 
 <section class="panel-card">
-  <h5>Daftar Pembimbing</h5>
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+    <div>
+      <h5 class="mb-0">Daftar Pembimbing &amp; Edit Data</h5>
+      <small class="text-muted">Klik tombol <strong>Edit Data</strong> pada baris pembimbing untuk mengubah nama, NIP, jabatan, bidang, username, atau email.</small>
+    </div>
+    <span class="badge text-bg-primary">{{ supervisors|length }} pembimbing terdaftar</span>
+  </div>
+
   <div class="table-responsive mt-2">
     <table class="table table-hover align-middle">
       <thead>
         <tr>
-          <th>#</th><th>Nama</th><th>NIP</th><th>Jabatan</th><th>Bidang</th>
-          <th>Akun</th><th>Kontrol</th>
+          <th>#</th>
+          <th>Nama Lengkap</th>
+          <th>NIP &amp; Jabatan</th>
+          <th>Bidang &amp; Peserta</th>
+          <th>Akun Login</th>
+          <th>Edit &amp; Kontrol Akun</th>
         </tr>
       </thead>
       <tbody>
         {% for sv in supervisors %}
+        {% set b_key = (sv.bidang or '')|trim|lower %}
+        {% set p_count = (participant_counts_by_bidang or {}).get(b_key, 0) if b_key else 0 %}
         <tr>
           <td>{{ sv.id }}</td>
           <td>
-            <button class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold"
-                    type="button"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#editSv{{ sv.id }}"
-                    aria-expanded="false">
-              {{ sv.nama_lengkap }}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ms-1"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-            <div class="collapse mt-2" id="editSv{{ sv.id }}">
-              <form method="post" action="/supervisors/{{ sv.id }}/edit" class="d-flex flex-column gap-1 p-2 rounded border bg-body-tertiary">
-                <input class="form-control form-control-sm" name="nama_lengkap" value="{{ sv.nama_lengkap }}" placeholder="Nama" required>
-                <input class="form-control form-control-sm" name="nip" value="{{ sv.nip or '' }}" placeholder="NIP">
-                <input class="form-control form-control-sm" name="jabatan" value="{{ sv.jabatan or '' }}" placeholder="Jabatan">
-                <input class="form-control form-control-sm" name="bidang" value="{{ sv.bidang or '' }}" placeholder="Bidang">
-                <button class="btn btn-sm btn-primary">Simpan</button>
-              </form>
-            </div>
+            <div class="fw-semibold">{{ sv.nama_lengkap }}</div>
+            <small class="text-muted">ID Pembimbing #{{ sv.id }}</small>
           </td>
-          <td>{{ sv.nip or '-' }}</td>
-          <td>{{ sv.jabatan or '-' }}</td>
-          <td>{{ sv.bidang or '-' }}</td>
+          <td>
+            <div><span class="text-muted small">NIP:</span> <span class="fw-medium">{{ sv.nip or '-' }}</span></div>
+            <div><span class="text-muted small">Jabatan:</span> {{ sv.jabatan or '-' }}</div>
+          </td>
+          <td>
+            {% if sv.bidang %}
+            <span class="badge text-bg-info">{{ sv.bidang }}</span>
+            <div class="small text-muted mt-1">{{ p_count }} peserta di bidang ini</div>
+            {% else %}
+            <span class="badge text-bg-warning">Belum diatur</span>
+            <div class="small text-muted mt-1">Memantau semua bidang</div>
+            {% endif %}
+          </td>
           <td>
             {% if sv.user %}
             <span class="fw-semibold">{{ sv.user.username }}</span>
             <br><small class="text-muted">{{ sv.user.email }}</small>
             {% if not sv.user.is_active %}
             <br><span class="badge text-bg-danger mt-1">Nonaktif</span>
+            {% else %}
+            <br><span class="badge text-bg-success mt-1">Aktif</span>
             {% endif %}
             {% else %}
             <span class="text-muted small">Tidak terhubung</span>
             {% endif %}
           </td>
-          <td>
-            {% if sv.user %}
-            <div class="d-flex flex-column gap-1">
-              <form method="post" action="/users/{{ sv.user.id }}/password" class="d-flex gap-1">
-                <input type="hidden" name="redirect_to" value="/supervisors">
-                <input class="form-control form-control-sm" type="password" name="new_password" minlength="8" placeholder="Password baru" required style="max-width:140px">
-                <button class="btn btn-sm btn-outline-primary" type="submit">Ubah</button>
+          <td style="min-width:290px">
+            <div class="d-flex flex-wrap gap-1 mb-1">
+              <button class="btn btn-sm btn-primary"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#editSv{{ sv.id }}"
+                      aria-expanded="false">
+                Edit Data Pembimbing
+              </button>
+              {% if sv.user %}
+              <button class="btn btn-sm btn-outline-secondary"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#secSv{{ sv.id }}"
+                      aria-expanded="false">
+                Keamanan Akun
+              </button>
+              {% endif %}
+            </div>
+
+            {# Form Edit Data Pembimbing Lengkap (Admin Only) #}
+            <div class="collapse mt-2" id="editSv{{ sv.id }}">
+              <form method="post" action="/supervisors/{{ sv.id }}/edit" class="p-3 rounded border bg-body-tertiary">
+                <div class="fw-semibold small mb-2 text-primary">Edit Data &amp; Akun Pembimbing</div>
+                <div class="row g-2">
+                  <div class="col-12">
+                    <label class="form-label small mb-0">Nama Lengkap</label>
+                    <input class="form-control form-control-sm" name="nama_lengkap" value="{{ sv.nama_lengkap }}" required>
+                  </div>
+                  <div class="col-sm-6">
+                    <label class="form-label small mb-0">NIP</label>
+                    <input class="form-control form-control-sm" name="nip" value="{{ sv.nip or '' }}" placeholder="NIP">
+                  </div>
+                  <div class="col-sm-6">
+                    <label class="form-label small mb-0">Jabatan</label>
+                    <input class="form-control form-control-sm" name="jabatan" value="{{ sv.jabatan or '' }}" placeholder="Jabatan">
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label small mb-0">Bidang Penempatan</label>
+                    <input class="form-control form-control-sm" name="bidang" value="{{ sv.bidang or '' }}" list="bidangOptions" placeholder="Contoh: Aptika / IKP / Sekretariat">
+                  </div>
+                  {% if sv.user %}
+                  <div class="col-sm-6">
+                    <label class="form-label small mb-0">Username Login</label>
+                    <input class="form-control form-control-sm" name="username" value="{{ sv.user.username }}" required>
+                  </div>
+                  <div class="col-sm-6">
+                    <label class="form-label small mb-0">Email</label>
+                    <input class="form-control form-control-sm" type="email" name="email" value="{{ sv.user.email }}" required>
+                  </div>
+                  {% endif %}
+                  <div class="col-12 d-flex justify-content-end gap-1 mt-2">
+                    <button type="button" class="btn btn-sm btn-light" data-bs-toggle="collapse" data-bs-target="#editSv{{ sv.id }}">Batal</button>
+                    <button type="submit" class="btn btn-sm btn-primary">Simpan Perubahan</button>
+                  </div>
+                </div>
               </form>
-              <div class="d-flex gap-1">
-                <form method="post" action="/users/{{ sv.user.id }}/force-logout">
+            </div>
+
+            {% if sv.user %}
+            <div class="collapse mt-2" id="secSv{{ sv.id }}">
+              <div class="p-2 rounded border bg-body-tertiary d-flex flex-column gap-2">
+                <form method="post" action="/users/{{ sv.user.id }}/password" class="d-flex gap-1">
                   <input type="hidden" name="redirect_to" value="/supervisors">
-                  <button class="btn btn-sm btn-outline-secondary" type="submit" title="Logout semua sesi">
-                    <i data-lucide="log-out" width="13" height="13"></i> Force Logout
-                  </button>
+                  <input class="form-control form-control-sm" type="password" name="new_password" minlength="8" placeholder="Password baru (min 8)" required>
+                  <button class="btn btn-sm btn-outline-primary" type="submit">Reset</button>
                 </form>
-                {% if sv.user.is_active %}
-                <form method="post" action="/users/{{ sv.user.id }}/soft-delete" onsubmit="return confirm('Nonaktifkan akun {{ sv.user.username }}?')">
-                  <input type="hidden" name="redirect_to" value="/supervisors">
-                  <button class="btn btn-sm btn-outline-danger" type="submit">Nonaktifkan</button>
-                </form>
-                {% endif %}
-                <form method="post" action="/users/{{ sv.user.id }}/delete" onsubmit="return confirm('Hapus permanen akun dan seluruh data pembimbing ini? Tindakan tidak dapat dibatalkan.')">
-                  <input type="hidden" name="redirect_to" value="/supervisors">
-                  <input type="hidden" name="confirmation" value="HAPUS">
-                  <button class="btn btn-sm btn-danger" type="submit">Hapus Permanen</button>
-                </form>
+                <div class="d-flex flex-wrap gap-1">
+                  <form method="post" action="/users/{{ sv.user.id }}/force-logout">
+                    <input type="hidden" name="redirect_to" value="/supervisors">
+                    <button class="btn btn-sm btn-outline-secondary" type="submit">Force Logout</button>
+                  </form>
+                  {% if sv.user.is_active %}
+                  <form method="post" action="/users/{{ sv.user.id }}/soft-delete" onsubmit="return confirm('Nonaktifkan akun {{ sv.user.username }}?')">
+                    <input type="hidden" name="redirect_to" value="/supervisors">
+                    <button class="btn btn-sm btn-outline-warning" type="submit">Nonaktifkan</button>
+                  </form>
+                  {% else %}
+                  <form method="post" action="/users/{{ sv.user.id }}/activate">
+                    <input type="hidden" name="redirect_to" value="/supervisors">
+                    <button class="btn btn-sm btn-success" type="submit">Aktifkan Kembali</button>
+                  </form>
+                  {% endif %}
+                  <form method="post" action="/users/{{ sv.user.id }}/delete" onsubmit="return confirm('Hapus permanen akun dan profil pembimbing ini?')">
+                    <input type="hidden" name="redirect_to" value="/supervisors">
+                    <input type="hidden" name="confirmation" value="HAPUS">
+                    <button class="btn btn-sm btn-danger" type="submit">Hapus</button>
+                  </form>
+                </div>
               </div>
             </div>
-            {% else %}
-            <span class="text-muted small">-</span>
             {% endif %}
           </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="7" class="text-center">
-            <div class="empty-state py-2">
+          <td colspan="6" class="text-center">
+            <div class="empty-state py-3">
               <p class="mb-1 fw-semibold">Belum ada data pembimbing.</p>
-              <small class="text-muted">Tambahkan dari formulir di atas.</small>
+              <small class="text-muted">Gunakan formulir di atas untuk membuat akun &amp; profil pembimbing.</small>
             </div>
           </td>
         </tr>

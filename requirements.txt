@@ -3,8 +3,10 @@ uvicorn[standard]>=0.30.0
 sqlalchemy>=2.0.31
 pydantic>=2.7.0
 pydantic-settings>=2.2.0
-python-jose[cryptography]>=3.0.0
-passlib[bcrypt]>=1.7.0
+# Sessions/JWT are HMAC-signed in app/authentication/jwt_handler.py (no jose).
+# Passwords use bcrypt directly (no passlib wrapper).
+bcrypt>=4.0.0
+cryptography>=42.0.0
 alembic>=1.10.0
 opencv-python>=4.10.0
 insightface>=0.7.0
@@ -16,3 +18,4 @@ reportlab>=4.0.0
 jinja2>=3.1.0
 python-multipart>=0.0.20
 mysqlclient>=2.2.0
+apscheduler>=3.10.0

@@ -8,43 +8,19 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.authentication.jwt_handler import verify_token
-from app.database import SessionLocal
+from app.database import get_db
 from app.models.assessment import Assessment
 from app.models.attendance import Attendance
 from app.models.journal import Journal
 from app.models.participant import Participant
 from app.models.user import User
+from app.security.session import require_user
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 
-def get_db() -> Session:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
 def get_request_user(request: Request, db: Session, authorization: str | None = Header(default=None)) -> User:
-    if authorization and authorization.lower().startswith("bearer "):
-        token = authorization.split(" ", 1)[1].strip()
-        try:
-            payload = verify_token(token)
-            user_id = int(payload["sub"])
-            user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
-            if user:
-                return user
-        except Exception:
-            pass
-
-    raw_user_id = request.cookies.get("user_id")
-    if raw_user_id and raw_user_id.isdigit():
-        user = db.query(User).filter(User.id == int(raw_user_id), User.is_active == True).first()
-        if user:
-            return user
-
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    return require_user(request, db, authorization)
 
 
 def ensure_admin(user: User) -> None:
@@ -347,107 +323,6 @@ def export_peserta_pdf(
     )
 
 
-@router.get("/peserta/{user_id}/sertifikat")
-def export_sertifikat_pkl(
-    user_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-    authorization: str | None = Header(default=None),
-) -> StreamingResponse:
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import cm
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
-
-    requester = get_request_user(request, db, authorization)
-    if requester.role not in {"admin", "pembimbing"} and requester.id != user_id:
-        raise HTTPException(status_code=403, detail="Akses ditolak")
-
-    target = db.query(User).filter(User.id == user_id).first()
-    if not target:
-        raise HTTPException(status_code=404, detail="Pengguna tidak ditemukan")
-
-    participant = db.query(Participant).filter(Participant.user_id == user_id).first()
-    assessments = db.query(Assessment).filter(Assessment.user_id == user_id).all()
-    total_absen = db.query(Attendance).filter(Attendance.user_id == user_id).count()
-    total_hadir = db.query(Attendance).filter(Attendance.user_id == user_id, Attendance.status == "hadir").count()
-    total_jurnal = db.query(Journal).filter(Journal.user_id == user_id).count()
-
-    avg_nilai = round(sum(a.nilai for a in assessments) / len(assessments), 1) if assessments else 0
-    nama = participant.nama_lengkap if participant else target.username
-    instansi = participant.instansi if participant else "-"
-    mulai = participant.tanggal_mulai.strftime("%d %B %Y") if participant and participant.tanggal_mulai else "-"
-    selesai = participant.tanggal_selesai.strftime("%d %B %Y") if participant and participant.tanggal_selesai else "-"
-
-    output = BytesIO()
-    doc = SimpleDocTemplate(output, pagesize=landscape(A4),
-                            leftMargin=2.5*cm, rightMargin=2.5*cm,
-                            topMargin=2*cm, bottomMargin=2*cm)
-
-    styles = getSampleStyleSheet()
-    gold = colors.HexColor("#d97706")
-    navy = colors.HexColor("#1e3a5f")
-    indigo = colors.HexColor("#6366f1")
-
-    center_xl = ParagraphStyle("cxl", parent=styles["Normal"], alignment=1, fontSize=28, fontName="Helvetica-Bold", textColor=navy, leading=34)
-    center_lg = ParagraphStyle("clg", parent=styles["Normal"], alignment=1, fontSize=15, textColor=navy, leading=20)
-    center_md = ParagraphStyle("cmd", parent=styles["Normal"], alignment=1, fontSize=12, textColor=colors.HexColor("#334155"), leading=16)
-    center_sm = ParagraphStyle("csm", parent=styles["Normal"], alignment=1, fontSize=9, textColor=colors.HexColor("#64748b"), leading=13)
-    name_style = ParagraphStyle("nm", parent=styles["Normal"], alignment=1, fontSize=30, fontName="Helvetica-BoldOblique", textColor=indigo, leading=36)
-
-    story = []
-    story.append(Spacer(1, 0.3*cm))
-    story.append(HRFlowable(width="100%", thickness=3, color=gold, spaceAfter=6))
-    story.append(HRFlowable(width="100%", thickness=1, color=gold, spaceAfter=12))
-
-    story.append(Paragraph("SERTIFIKAT PENYELESAIAN", center_xl))
-    story.append(Paragraph("Praktik Kerja Lapangan (PKL)", center_lg))
-    story.append(Spacer(1, 0.5*cm))
-    story.append(HRFlowable(width="60%", thickness=0.5, color=colors.HexColor("#cbd5e1")))
-    story.append(Spacer(1, 0.4*cm))
-    story.append(Paragraph("Diberikan kepada", center_md))
-    story.append(Spacer(1, 0.25*cm))
-    story.append(Paragraph(nama, name_style))
-    story.append(Spacer(1, 0.3*cm))
-
-    detail_data = [
-        ["Instansi PKL", ":", instansi],
-        ["Periode", ":", f"{mulai}  –  {selesai}"],
-        ["Total Absensi", ":", f"{total_hadir} hadir dari {total_absen} hari"],
-        ["Total Jurnal", ":", f"{total_jurnal} entri"],
-        ["Nilai Rata-rata", ":", f"{avg_nilai}"],
-    ]
-    detail_tbl = Table(detail_data, colWidths=[4*cm, 0.5*cm, 10*cm], hAlign="CENTER")
-    detail_tbl.setStyle(TableStyle([
-        ("FONTSIZE", (0, 0), (-1, -1), 11),
-        ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#475569")),
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-        ("TEXTCOLOR", (2, 0), (2, -1), navy),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-    ]))
-    story.append(detail_tbl)
-    story.append(Spacer(1, 0.6*cm))
-
-    story.append(HRFlowable(width="60%", thickness=0.5, color=colors.HexColor("#cbd5e1")))
-    story.append(Spacer(1, 0.3*cm))
-    story.append(Paragraph("Diterbitkan oleh Dinas Komunikasi dan Informatika Kabupaten Batu Bara", center_sm))
-    story.append(Paragraph(f"Tanggal cetak: {datetime.now().strftime('%d %B %Y')}", center_sm))
-    story.append(Spacer(1, 0.3*cm))
-    story.append(HRFlowable(width="100%", thickness=1, color=gold, spaceBefore=6))
-    story.append(HRFlowable(width="100%", thickness=3, color=gold))
-
-    doc.build(story)
-    output.seek(0)
-    safe = nama.replace(" ", "_")
-    return StreamingResponse(
-        output,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=sertifikat-pkl-{safe}.pdf"},
-    )
-
-
 @router.get("/analytics/trend")
 def get_attendance_trend(
     request: Request,
@@ -458,80 +333,32 @@ def get_attendance_trend(
     from sqlalchemy import func as sqlfunc
     from datetime import date, timedelta
 
-    requester = get_request_user(request, db, authorization)
+    get_request_user(request, db, authorization)
     today = date.today()
+    start = today - timedelta(days=max(1, days) - 1)
+
+    from sqlalchemy import case as sqlcase
+
+    # One aggregate query instead of 2 queries per day (audit finding F-21).
+    rows = (
+        db.query(
+            sqlfunc.date(Attendance.attendance_date).label("day"),
+            sqlfunc.count(Attendance.id).label("total"),
+            sqlfunc.sum(sqlcase((Attendance.status == "hadir", 1), else_=0)).label("hadir"),
+        )
+        .filter(sqlfunc.date(Attendance.attendance_date) >= start.isoformat())
+        .group_by(sqlfunc.date(Attendance.attendance_date))
+        .all()
+    )
+    by_day = {
+        str(row.day): (int(row.total or 0), int(row.hadir or 0)) for row in rows
+    }
+
     result = []
     for i in range(days - 1, -1, -1):
         d = today - timedelta(days=i)
-        count = db.query(Attendance).filter(
-            sqlfunc.date(Attendance.attendance_date) == d
-        ).count()
-        hadir = db.query(Attendance).filter(
-            sqlfunc.date(Attendance.attendance_date) == d,
-            Attendance.status == "hadir",
-        ).count()
-        result.append({"date": d.isoformat(), "label": d.strftime("%d/%m"), "total": count, "hadir": hadir})
+        total, hadir = by_day.get(str(d), (0, 0))
+        result.append(
+            {"date": d.isoformat(), "label": d.strftime("%d/%m"), "total": total, "hadir": hadir}
+        )
     return {"data": result}
-
-
-@router.get("/rekap/csv")
-def export_rekap_csv(
-    request: Request,
-    review_filter: str = Query(default="all"),
-    db: Session = Depends(get_db),
-    authorization: str | None = Header(default=None),
-) -> StreamingResponse:
-    """Official recap CSV: per-peserta attendance + journal + assessment summary."""
-    import csv
-    from io import StringIO
-
-    requester = get_request_user(request, db, authorization)
-    ensure_admin(requester)
-
-    peserta_list = db.query(User).filter(User.role == "peserta", User.is_active == True).all()
-    out = StringIO()
-    writer = csv.writer(out)
-    writer.writerow(["No", "Nama", "Username", "Jurusan", "Instansi",
-                     "Periode Mulai", "Periode Selesai",
-                     "Total Absensi", "Hadir", "Terlambat", "Izin",
-                     "Review Pending", "Review Approved", "Review Rejected", "Alasan Grace", "Alasan Risk",
-                     "Total Jurnal", "Jurnal Disetujui",
-                     "Rata-rata Nilai"])
-
-    for i, p in enumerate(peserta_list, 1):
-        part = db.query(Participant).filter(Participant.user_id == p.id).first()
-        att_query = db.query(Attendance).filter(Attendance.user_id == p.id)
-        att_query = apply_attendance_review_filter(att_query, review_filter)
-        atts = att_query.all()
-        jrns = db.query(Journal).filter(Journal.user_id == p.id).all()
-        from app.models.assessment import Assessment as _Asmnt
-        asmts = db.query(_Asmnt).filter(_Asmnt.user_id == p.id).all()
-        avg = round(sum(a.nilai for a in asmts) / len(asmts), 1) if asmts else 0
-
-        writer.writerow([
-            i, part.nama_lengkap if part else p.username, p.username,
-            part.jurusan if part else "", part.instansi if part else "",
-            part.tanggal_mulai.strftime("%d/%m/%Y") if part and part.tanggal_mulai else "",
-            part.tanggal_selesai.strftime("%d/%m/%Y") if part and part.tanggal_selesai else "",
-            len(atts),
-            sum(1 for a in atts if a.status == "hadir"),
-            sum(1 for a in atts if a.status == "terlambat"),
-            sum(1 for a in atts if a.status == "izin"),
-            sum(1 for a in atts if (a.location_review_status or "") == "pending"),
-            sum(1 for a in atts if (a.location_review_status or "") == "approved"),
-            sum(1 for a in atts if (a.location_review_status or "") == "rejected"),
-            sum(1 for a in atts if (a.location_review_reason or "") in {"grace", "grace_and_risk"}),
-            sum(1 for a in atts if (a.location_review_reason or "") in {"risk", "grace_and_risk"}),
-            len(jrns),
-            sum(1 for j in jrns if j.status in {"approved", "disetujui", "valid"}),
-            avg,
-        ])
-
-    out.seek(0)
-    filename = f"rekap-pkl-{datetime.now().strftime('%Y%m%d')}.csv"
-    return StreamingResponse(
-        iter([out.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
-

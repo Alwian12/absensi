@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lembar Jurnal Kegiatan PKL — {{ participant.nama_lengkap if participant else (target_user.username if target_user else 'Peserta') }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='vendor/bootstrap.min.css') }}">
+  <style>
+    body {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      font-size: 13px;
+    }
+    .print-sheet {
+      max-width: 960px;
+      margin: 1.5rem auto;
+      background: #ffffff;
+      padding: 2rem 2.25rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      box-shadow: 0 6px 24px rgba(15, 23, 42, 0.06);
+    }
+    .doc-header {
+      border-bottom: 3px double #0f172a;
+      padding-bottom: .85rem;
+      margin-bottom: 1.25rem;
+    }
+    .doc-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+      margin: 0;
+    }
+    .doc-subtitle {
+      font-size: .85rem;
+      color: #475569;
+      margin: .15rem 0 0;
+    }
+    .meta-table td {
+      padding: .2rem .5rem .2rem 0;
+      vertical-align: top;
+    }
+    .journal-print-table th {
+      background: #f8fafc;
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      vertical-align: middle;
+    }
+    .journal-print-table td {
+      vertical-align: middle;
+    }
+    .qr-box {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: .35rem .5rem;
+      background: #fff;
+      text-align: left;
+    }
+    .qr-placeholder {
+      border: 1px dashed #94a3b8;
+      border-radius: 6px;
+      padding: .65rem .5rem;
+      text-align: center;
+      color: #64748b;
+      font-size: .72rem;
+    }
+    @media print {
+      body { background: #fff; }
+      .no-print { display: none !important; }
+      .print-sheet {
+        margin: 0;
+        padding: 0;
+        border: none;
+        box-shadow: none;
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container py-2 no-print">
+    <div class="d-flex justify-content-between align-items-center bg-white border rounded p-2 px-3 shadow-sm" style="max-width:960px;margin:0 auto">
+      <div>
+        <strong>Pratinjau Cetak Lembar Jurnal PKL &amp; Barcode Pembimbing</strong>
+        <span class="text-muted small d-block">Gunakan tombol Cetak / Simpan PDF untuk melampirkan jurnal ini pada laporan PKL.</span>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="/journal" class="btn btn-sm btn-outline-secondary">Kembali ke Jurnal</a>
+        <button type="button" class="btn btn-sm btn-primary fw-semibold" onclick="window.print()">Cetak / Simpan PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="print-sheet">
+    <header class="doc-header d-flex justify-content-between align-items-start flex-wrap gap-2">
+      <div>
+        <h1 class="doc-title">Lembar Jurnal Kegiatan Praktik Kerja Lapangan (PKL)</h1>
+        <p class="doc-subtitle">Sistem Monitoring Absensi &amp; Jurnal PKL — Dilengkapi Verifikasi Barcode QR Pembimbing</p>
+      </div>
+      <div class="text-end small text-muted">
+        Dicetak: {{ printed_at.strftime('%d/%m/%Y %H:%M') }}
+      </div>
+    </header>
+
+    <section class="row g-3 mb-3">
+      <div class="col-sm-6">
+        <table class="meta-table">
+          <tr>
+            <td class="text-muted fw-semibold" style="width:140px">Nama Peserta</td>
+            <td>: <strong>{{ participant.nama_lengkap if participant else (target_user.username if target_user else '-') }}</strong></td>
+          </tr>
+          <tr>
+            <td class="text-muted fw-semibold">Asal Instansi</td>
+            <td>: {{ participant.instansi if participant and participant.instansi else '-' }}</td>
+          </tr>
+          <tr>
+            <td class="text-muted fw-semibold">Jurusan / Prodi</td>
+            <td>: {{ participant.jurusan if participant and participant.jurusan else '-' }}</td>
+          </tr>
+        </table>
+      </div>
+      <div class="col-sm-6">
+        <table class="meta-table">
+          <tr>
+            <td class="text-muted fw-semibold" style="width:155px">Bidang Penempatan</td>
+            <td>: <strong>{{ participant.bidang if participant and participant.bidang else 'Belum ditentukan' }}</strong></td>
+          </tr>
+          <tr>
+            <td class="text-muted fw-semibold">Pembimbing Bidang</td>
+            <td>: {{ assigned_supervisor.nama_lengkap if assigned_supervisor else '-' }}</td>
+          </tr>
+          <tr>
+            <td class="text-muted fw-semibold">NIP Pembimbing</td>
+            <td>: {{ assigned_supervisor.nip if assigned_supervisor and assigned_supervisor.nip else '-' }}</td>
+          </tr>
+        </table>
+      </div>
+    </section>
+
+    <div class="table-responsive">
+      <table class="table table-bordered journal-print-table">
+        <thead>
+          <tr>
+            <th style="width:42px" class="text-center">No</th>
+            <th style="width:110px">Tanggal</th>
+            <th>Uraian Kegiatan / Pekerjaan</th>
+            <th style="width:170px">Output / Hasil</th>
+            <th style="width:160px">Catatan Pembimbing</th>
+            <th style="width:230px" class="text-center">Paraf / Barcode Pembimbing</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in journals %}
+          {% set sig = signature_links.get(item.id) %}
+          <tr>
+            <td class="text-center">{{ loop.index }}</td>
+            <td>
+              <strong>{{ item.tanggal.strftime('%d/%m/%Y') if item.tanggal else '-' }}</strong>
+              {% if item.tanggal %}<div class="text-muted small">{{ item.tanggal.strftime('%H:%M') }} WIB</div>{% endif %}
+            </td>
+            <td style="white-space:pre-line">{{ item.kegiatan }}</td>
+            <td style="white-space:pre-line">{{ item.output or '-' }}</td>
+            <td class="small" style="white-space:pre-line">{{ item.komentar or '-' }}</td>
+            <td class="text-center">
+              {% if sig %}
+              <a href="{{ sig.verify_url }}" target="_blank" rel="noopener" class="d-inline-block text-decoration-none" title="Scan atau klik untuk melihat profil pembimbing &amp; bukti pengesahan">
+                <img src="{{ sig.qr_url }}" alt="QR Barcode Pembimbing #{{ item.id }}" width="82" height="82" class="border rounded p-1 bg-white">
+              </a>
+              {% else %}
+              <div class="qr-placeholder">
+                Space Barcode Pembimbing<br>
+                <span style="font-size:.66rem">({{ item.status | upper }})</span>
+              </div>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-4">Belum ada catatan jurnal kegiatan untuk peserta ini.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="row mt-4 pt-2 align-items-center">
+      <div class="col-7 small text-muted">
+        <strong>Petunjuk Verifikasi Barcode:</strong><br>
+        Pindai (scan) QR Barcode Pembimbing menggunakan kamera ponsel untuk membuka halaman resmi <strong>Profil Pembimbing Bidang PKL</strong> beserta rincian NIP, Jabatan, Bidang Penugasan, dan status pengesahan jurnal.
+      </div>
+      <div class="col-5 text-center">
+        <div class="small fw-semibold mb-2">Mengetahui, Pembimbing Bidang PKL</div>
+        {% if supervisor_qr_url %}
+        <div class="my-1">
+          <a href="{{ supervisor_verify_url }}" target="_blank" rel="noopener" class="d-inline-block text-decoration-none" title="Scan untuk melihat Profil Pembimbing PKL">
+            <img src="{{ supervisor_qr_url }}" alt="Barcode Profil Pembimbing" width="112" height="112" class="border rounded p-1 bg-white shadow-sm">
+          </a>
+          <div class="text-muted" style="font-size:.7rem;margin-top:2px">Scan Barcode untuk Profil Pembimbing</div>
+        </div>
+        {% else %}
+        <div class="qr-placeholder mx-auto my-2" style="max-width:160px">
+          Space Barcode Pembimbing<br>
+          <span style="font-size:.66rem">(Pembimbing bidang belum ditetapkan)</span>
+        </div>
+        {% endif %}
+      </div>
+    </footer>
+  </main>
+</body>
+</html>
+

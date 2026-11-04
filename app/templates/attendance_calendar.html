@@ -4,15 +4,30 @@
 {% block page_title %}Kalender Absensi{% endblock %}
 
 {% block content %}
+{% if bidang_scope and bidang_scope.is_supervisor and bidang_scope.supervisor_bidang %}
+<div class="alert alert-info d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <strong>Filter Bidang Pembimbing: {{ bidang_scope.supervisor_bidang }}</strong>
+    <span class="small d-block text-muted">
+      {% if bidang_scope.scope == 'bidang' %}Menampilkan daftar peserta bidang <strong>{{ bidang_scope.supervisor_bidang }}</strong>.{% else %}Menampilkan seluruh peserta lintas bidang.{% endif %}
+    </span>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/attendance/calendar?year={{ year }}&month={{ month }}&scope=bidang" class="btn btn-sm {% if bidang_scope.scope == 'bidang' %}btn-primary{% else %}btn-outline-primary{% endif %}">Bidang Saya</a>
+    <a href="/attendance/calendar?year={{ year }}&month={{ month }}&scope=all" class="btn btn-sm {% if bidang_scope.scope == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">Semua Bidang</a>
+  </div>
+</div>
+{% endif %}
+
 <section class="panel-card page-hero mb-3">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
     <div>
       <h5 class="mb-1">Kalender Absensi Bulanan</h5>
       <p class="text-muted mb-0">
         {% if can_manage_attendance %}
-        Lihat rekap kehadiran per peserta dalam tampilan kalender.
+        Lihat rekap kehadiran per peserta dalam tampilan kalender bulanan.
         {% else %}
-        Lihat rekap kehadiran Anda dalam tampilan kalender.
+        Lihat rekap kehadiran Anda dalam tampilan kalender bulanan.
         {% endif %}
       </p>
     </div>
@@ -25,11 +40,15 @@
   <form method="get" action="/attendance/calendar" class="row g-2 align-items-end">
     <input type="hidden" name="year" value="{{ year }}">
     <input type="hidden" name="month" value="{{ month }}">
-    <div class="col-md-6 col-lg-4">
-      <label class="form-label small text-uppercase fw-semibold">Pilih Peserta</label>
+    {% if bidang_scope and bidang_scope.scope %}<input type="hidden" name="scope" value="{{ bidang_scope.scope }}">{% endif %}
+    <div class="col-md-6 col-lg-5">
+      <label class="form-label small text-uppercase fw-semibold">Pilih Peserta PKL</label>
       <select class="form-select" name="user_id" onchange="this.form.submit()">
         {% for u in users %}
-        <option value="{{ u.id }}" {% if u.id == target_user_id %}selected{% endif %}>{{ u.username }}</option>
+        {% set p_u = (participant_map or {}).get(u.id) %}
+        <option value="{{ u.id }}" {% if u.id == target_user_id %}selected{% endif %}>
+          {{ p_u.nama_lengkap if p_u else u.username }}{% if p_u and p_u.bidang %} ({{ p_u.bidang }}){% endif %} — @{{ u.username }}
+        </option>
         {% else %}
         <option value="">Belum ada peserta</option>
         {% endfor %}
@@ -40,14 +59,25 @@
 {% endif %}
 
 <section class="panel-card mb-3">
+  {% set target_p = (participant_map or {}).get(target_user_id) if target_user_id else None %}
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <a class="btn btn-outline-secondary btn-sm"
-       href="/attendance/calendar?year={{ prev_year }}&month={{ prev_month }}{% if can_manage_attendance and target_user_id %}&user_id={{ target_user_id }}{% endif %}">
+       href="/attendance/calendar?year={{ prev_year }}&month={{ prev_month }}{% if can_manage_attendance and target_user_id %}&user_id={{ target_user_id }}{% endif %}{% if bidang_scope and bidang_scope.scope == 'all' %}&scope=all{% endif %}">
       &lsaquo; Bulan Sebelumnya
     </a>
-    <h5 class="mb-0">{{ month_name }} {{ year }}{% if can_manage_attendance and target_user %} — {{ target_user.username }}{% endif %}</h5>
+    <div class="text-center">
+      <h5 class="mb-0">
+        {{ month_name }} {{ year }}
+        {% if can_manage_attendance and target_user %}
+          — {{ target_p.nama_lengkap if target_p else target_user.username }}
+        {% endif %}
+      </h5>
+      {% if target_p and target_p.bidang %}
+      <span class="badge text-bg-info mt-1">Bidang {{ target_p.bidang }}</span>
+      {% endif %}
+    </div>
     <a class="btn btn-outline-secondary btn-sm"
-       href="/attendance/calendar?year={{ next_year }}&month={{ next_month }}{% if can_manage_attendance and target_user_id %}&user_id={{ target_user_id }}{% endif %}">
+       href="/attendance/calendar?year={{ next_year }}&month={{ next_month }}{% if can_manage_attendance and target_user_id %}&user_id={{ target_user_id }}{% endif %}{% if bidang_scope and bidang_scope.scope == 'all' %}&scope=all{% endif %}">
       Bulan Berikutnya &rsaquo;
     </a>
   </div>
@@ -67,14 +97,14 @@
     </div>
     <div class="col-6 col-md-3">
       <div class="mini-metric mini-metric-mid">
-        <span class="mini-metric-label">Izin</span>
-        <strong class="mini-metric-value">{{ status_counts.get('izin', 0) }}</strong>
+        <span class="mini-metric-label">Izin / Sakit</span>
+        <strong class="mini-metric-value">{{ status_counts.get('izin', 0) + status_counts.get('sakit', 0) }}</strong>
       </div>
     </div>
     <div class="col-6 col-md-3">
       <div class="mini-metric mini-metric-neutral">
-        <span class="mini-metric-label">Lainnya</span>
-        <strong class="mini-metric-value">{{ (status_counts.values() | sum) - status_counts.get('hadir', 0) - status_counts.get('terlambat', 0) - status_counts.get('izin', 0) }}</strong>
+        <span class="mini-metric-label">Alpa / Lainnya</span>
+        <strong class="mini-metric-value">{{ (status_counts.values() | sum) - status_counts.get('hadir', 0) - status_counts.get('terlambat', 0) - status_counts.get('izin', 0) - status_counts.get('sakit', 0) }}</strong>
       </div>
     </div>
   </div>

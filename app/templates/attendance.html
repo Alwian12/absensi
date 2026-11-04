@@ -4,6 +4,21 @@
 {% block page_title %}{{ attendance_page_title }}{% endblock %}
 
 {% block content %}
+{% if bidang_scope and bidang_scope.is_supervisor and bidang_scope.supervisor_bidang %}
+<div class="alert alert-info d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <strong>Filter Bidang Pembimbing: {{ bidang_scope.supervisor_bidang }}</strong>
+    <span class="small d-block text-muted">
+      {% if bidang_scope.scope == 'bidang' %}Menampilkan absensi peserta bidang <strong>{{ bidang_scope.supervisor_bidang }}</strong>.{% else %}Menampilkan seluruh peserta lintas bidang.{% endif %}
+    </span>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/attendance?scope=bidang" class="btn btn-sm {% if bidang_scope.scope == 'bidang' %}btn-primary{% else %}btn-outline-primary{% endif %}">Bidang Saya</a>
+    <a href="/attendance?scope=all" class="btn btn-sm {% if bidang_scope.scope == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">Semua Bidang</a>
+  </div>
+</div>
+{% endif %}
+
 {% set attendance_stats = namespace(hadir=0, terlambat=0, izin=0, other=0) %}
 {% for item in attendance %}
   {% set status = (item.status or '')|lower %}
@@ -18,70 +33,49 @@
   {% endif %}
 {% endfor %}
 
-<section class="panel-card page-hero page-hero-attendance mb-3">
-  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
-    <div class="hero-title-wrap">
-      <span class="hero-glyph" aria-hidden="true">
-        <svg viewBox="0 0 24 24" role="img" focusable="false" aria-hidden="true">
-          <rect x="3" y="5" width="18" height="16" rx="2"></rect>
-          <path d="M8 3v4"></path>
-          <path d="M16 3v4"></path>
-          <path d="M3 10h18"></path>
-          <path d="M10 15l2 2 4-4"></path>
-        </svg>
-      </span>
-      <div>
-      <h5 class="mb-0">{{ attendance_page_title }}</h5>
-      </div>
-    </div>
-    <span class="summary-badge">{{ attendance|length }} data</span>
-  </div>
-  <div class="row g-2 mt-2 mini-metric-row">
-    <div class="col-sm-3">
-      <div class="mini-metric mini-metric-high">
-        <span class="mini-metric-label">Hadir</span>
-        <strong class="mini-metric-value">{{ attendance_stats.hadir }}</strong>
-      </div>
-    </div>
-    <div class="col-sm-3">
-      <div class="mini-metric mini-metric-low">
-        <span class="mini-metric-label">Terlambat</span>
-        <strong class="mini-metric-value">{{ attendance_stats.terlambat }}</strong>
-      </div>
-    </div>
-    <div class="col-sm-3">
-      <div class="mini-metric mini-metric-mid">
-        <span class="mini-metric-label">Izin</span>
-        <strong class="mini-metric-value">{{ attendance_stats.izin }}</strong>
-      </div>
-    </div>
-    <div class="col-sm-3">
-      <div class="mini-metric mini-metric-neutral">
-        <span class="mini-metric-label">Lainnya</span>
-        <strong class="mini-metric-value">{{ attendance_stats.other }}</strong>
-      </div>
-    </div>
-  </div>
-</section>
-
 {% if show_face_panel %}
 <section
   class="panel-card mb-3 panel-elevated attendance-face-panel"
   data-success-auto-hide-seconds="{{ attendance_ui_config.success_auto_hide_seconds if attendance_ui_config else 9 }}"
   data-transition-style="{{ attendance_ui_config.transition_style if attendance_ui_config else 'normal' }}"
 >
-  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 pb-2 border-bottom">
     <div>
-      <h5 class="mb-1">Absensi Verifikasi Wajah</h5>
-      <p class="text-muted mb-0 attendance-guide-lead">Ikuti instruksi visual di panel ini. Sistem akan memandu dari kamera aktif, fokus wajah, liveness, sampai verifikasi berhasil.</p>
+      <h5 class="mb-0 fw-bold">Presensi Wajah &amp; Lokasi GPS</h5>
+      <p class="text-muted small mb-0">Sistem memberi jeda di setiap tahapan agar Anda dapat mengikuti instruksi dengan tenang melalui HP.</p>
     </div>
-    <span id="faceStageBadge" class="face-stage-badge stage-idle">Siap</span>
+    <div class="d-flex align-items-center gap-2">
+      <label class="face-voice-toggle small d-inline-flex align-items-center gap-1 border rounded px-2 py-1 bg-body-tertiary">
+        <input type="checkbox" id="voiceGuideToggle" checked>
+        <span>Suara Panduan</span>
+      </label>
+      <span id="faceStageBadge" class="face-stage-badge stage-idle">Siap</span>
+    </div>
   </div>
+
   {% if just_registered %}
   <div class="alert alert-success small mb-3" role="alert">
-    Registrasi wajah berhasil disimpan. Sekarang tombol <strong>Check-in</strong> dan <strong>Check-out</strong> sudah aktif, silakan lanjutkan absensi.
+    <strong>Registrasi Wajah Berhasil!</strong> 5 sampel wajah Anda telah tersimpan. Sekarang tombol <strong>Check-in Wajah</strong> dan <strong>Check-out Wajah</strong> sudah dapat digunakan.
   </div>
   {% endif %}
+
+  <details class="mb-3 border rounded p-2 bg-body-tertiary" {% if not has_face_registered %}open{% endif %}>
+    <summary class="fw-semibold small" style="cursor:pointer">
+      Petunjuk Penggunaan Absensi di HP (Klik untuk buka/tutup panduan)
+    </summary>
+    <div class="mt-2 small text-muted">
+      <ol class="mb-2 ps-3">
+        <li class="mb-1"><strong>Izinkan Kamera &amp; GPS Presisi:</strong> Saat browser HP meminta izin Kamera dan Lokasi, pilih <em>Izinkan / Allow</em> dan aktifkan <em>Lokasi Akurat (Precise Location)</em>.</li>
+        <li class="mb-1"><strong>Jeda Persiapan Otomatis:</strong> Saat Anda menekan tombol <strong>Registrasi</strong> atau <strong>Check-in/Check-out</strong>, kamera akan aktif otomatis dan sistem memberi jeda ~2 detik sebelum hitung mundur <code>3 - 2 - 1</code> dimulai.</li>
+        <li class="mb-1"><strong>Registrasi Wajah Terarah (5 Sampel):</strong> Untuk pengguna baru, sistem akan memandu pengambilan 5 pose wajah secara bertahap (hadap lurus, tahan stabil, miring sedikit kiri/kanan) dengan jeda antar sampel.</li>
+        <li class="mb-0"><strong>Verifikasi Liveness (Cegah Foto):</strong> Saat diminta berkedip atau menggerakkan kepala sedikit, lakukan gerakan ringan selama ~2 detik hingga bar progres penuh.</li>
+      </ol>
+      <div class="p-2 rounded border bg-white text-dark">
+        <strong>Info Area Geofence:</strong> Radius kantor <strong>{{ attendance_ui_config.office_radius_m if attendance_ui_config else 200 }}m</strong> (toleransi <strong>{{ attendance_ui_config.office_grace_m if attendance_ui_config else 15 }}m</strong>, batas akurasi GPS <strong>{{ attendance_ui_config.office_max_accuracy_m if attendance_ui_config else 80 }}m</strong> — sumber: {% if attendance_ui_config and attendance_ui_config.office_policy_source == 'institution' %}instansi {{ attendance_ui_config.office_institution_name or '' }}{% else %}kantor utama{% endif %}).
+      </div>
+    </div>
+  </details>
+
   <div class="row g-3 align-items-start">
     <div class="col-lg-5">
       <div class="attendance-camera-shell" id="attendanceCameraShell" data-guide-stage="idle">
@@ -95,8 +89,8 @@
           <div class="camera-corner camera-corner-bl"></div>
           <div class="camera-corner camera-corner-br"></div>
           <div class="camera-idle-prompt" id="cameraIdlePrompt">
-            <button type="button" class="btn btn-light btn-sm" id="btnStartCamera">Aktifkan Kamera</button>
-            <span>Kamera belum aktif</span>
+            <button type="button" class="btn btn-light btn-sm fw-semibold shadow-sm" id="btnStartCamera">1. Aktifkan Kamera</button>
+            <span>Atau langsung tekan tombol Absen / Registrasi di bawah</span>
           </div>
           <div id="faceCountdownOverlay" class="face-countdown-overlay d-none">
             <span id="faceCountdownValue" class="face-countdown-value">3</span>
@@ -117,90 +111,102 @@
         </div>
         <div class="camera-live-caption">
           <span class="camera-live-dot"></span>
-          <span>Mode panduan aktif</span>
+          <span>Kamera Panduan Interaktif</span>
         </div>
       </div>
       <canvas id="captureCanvas" class="d-none"></canvas>
+
+      <div class="face-quality-grid mt-2">
+        <div id="qualityBrightness" class="face-quality-chip state-wait">Cahaya: menunggu kamera</div>
+        <div id="qualityFraming" class="face-quality-chip state-wait">Posisi: tengah bingkai</div>
+        <div id="qualityStability" class="face-quality-chip state-wait">Stabilitas: tahan tenang</div>
+      </div>
     </div>
+
     <div class="col-lg-7">
       <div class="face-command-card mb-3" id="faceCommandCard">
-        <p class="face-command-kicker mb-1">Panduan Absensi</p>
-        <h6 id="faceCommandHeadline" class="face-command-headline mb-1">Aktifkan kamera untuk mulai absensi.</h6>
-        <p id="faceCommandSubtext" class="face-command-subtext mb-0">Pastikan wajah terlihat jelas, pencahayaan cukup, dan kamera berada setinggi mata.</p>
+        <p class="face-command-kicker mb-1">Instruksi Tahap Ini</p>
+        <h6 id="faceCommandHeadline" class="face-command-headline mb-1">Siap memulai absensi atau registrasi wajah.</h6>
+        <p id="faceCommandSubtext" class="face-command-subtext mb-0">Pegang HP sejajar wajah dengan pencahayaan cukup. Sistem akan memberi aba-aba sebelum mengambil gambar.</p>
       </div>
 
-      <div class="face-how-it-works mb-3" id="faceHowItWorks">
-        <p class="face-how-title mb-2">Cara Kerja Absensi Wajah</p>
-        <div class="face-how-steps">
-          <div class="face-how-step"><strong>1.</strong> Aktifkan kamera dan posisikan wajah di bingkai panduan.</div>
-          <div class="face-how-step"><strong>2.</strong> Ikuti instruksi liveness (kedip atau gerakkan kepala sedikit).</div>
-          <div class="face-how-step"><strong>3.</strong> Sistem membandingkan wajah dengan data terdaftar.</div>
-          <div class="face-how-step"><strong>4.</strong> Jika cocok, absensi tersimpan dan status berhasil ditampilkan.</div>
+      <div id="livenessHint" class="liveness-hint d-none mb-3" aria-live="polite">
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="12" rx="10" ry="6"/><circle cx="12" cy="12" r="3"/></svg>
+          <span id="livenessHintText" class="fw-semibold small">Ikuti instruksi di layar…</span>
+        </div>
+        <div class="liveness-progress-wrap">
+          <div id="livenessProgressBar" class="liveness-progress-fill" style="width:0%"></div>
         </div>
       </div>
 
       <div class="face-step-grid mb-3" id="faceStepGrid">
         <div class="face-step-chip is-active" data-face-step="camera">
           <span class="face-step-index">1</span>
-          <span class="face-step-copy">Aktifkan kamera</span>
+          <span class="face-step-copy">Kamera Siap</span>
         </div>
         <div class="face-step-chip" data-face-step="position">
           <span class="face-step-index">2</span>
-          <span class="face-step-copy">Posisikan wajah</span>
+          <span class="face-step-copy">Fokus Wajah</span>
         </div>
         <div class="face-step-chip" data-face-step="liveness">
           <span class="face-step-index">3</span>
-          <span class="face-step-copy">Ikuti gerakan</span>
+          <span class="face-step-copy">Uji Gerak</span>
         </div>
         <div class="face-step-chip" data-face-step="verify">
           <span class="face-step-index">4</span>
-          <span class="face-step-copy">Verifikasi absen</span>
+          <span class="face-step-copy">Simpan Data</span>
         </div>
       </div>
 
-      <div class="face-quality-panel mb-3">
-        <div class="face-quality-head d-flex justify-content-between align-items-center gap-2 flex-wrap">
-          <span class="face-quality-title">Kesiapan Kamera</span>
-          <label class="face-voice-toggle">
-            <input type="checkbox" id="voiceGuideToggle" checked>
-            <span>Voice cue</span>
-          </label>
+      <div class="face-step-section mb-3" id="faceAttendanceSection">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-1 mb-2">
+          <p class="face-step-section-title mb-0">Absensi Harian (Masuk &amp; Pulang)</p>
+          {% if has_face_registered %}
+          <span class="badge text-bg-success">Wajah Terdaftar</span>
+          {% else %}
+          <span class="badge text-bg-warning">Wajib Registrasi Wajah Dulu</span>
+          {% endif %}
         </div>
-        <div class="face-quality-grid mt-2">
-          <div id="qualityBrightness" class="face-quality-chip state-wait">Cahaya: menunggu kamera</div>
-          <div id="qualityFraming" class="face-quality-chip state-wait">Framing: siapkan wajah di tengah</div>
-          <div id="qualityStability" class="face-quality-chip state-wait">Stabilitas: tahan posisi sejenak</div>
+        <div class="row g-2 face-action-wrap">
+          <div class="col-6">
+            <button type="button" class="btn btn-success w-100 py-2 fw-semibold" id="btnCheckinFace" {% if not has_face_registered %}disabled title="Lakukan Registrasi Wajah terlebih dahulu"{% endif %}>
+              Check-in Masuk
+            </button>
+          </div>
+          <div class="col-6">
+            <button type="button" class="btn btn-warning w-100 py-2 fw-semibold" id="btnCheckoutFace" {% if not has_face_registered %}disabled title="Lakukan Registrasi Wajah terlebih dahulu"{% endif %}>
+              Check-out Pulang
+            </button>
+          </div>
         </div>
-        <p class="small text-muted mb-0 mt-2">GPS wajib aktif. Radius utama {{ attendance_ui_config.office_radius_m if attendance_ui_config else 200 }}m, grace {{ attendance_ui_config.office_grace_m if attendance_ui_config else 15 }}m (masuk review), dan akurasi maksimal {{ attendance_ui_config.office_max_accuracy_m if attendance_ui_config else 80 }}m.</p>
-        <p class="small text-muted mb-0 mt-1">Sumber geofence: {% if attendance_ui_config and attendance_ui_config.office_policy_source == 'institution' %}instansi {{ attendance_ui_config.office_institution_name or '' }}{% else %}global kantor{% endif %}.</p>
       </div>
 
       <div class="face-step-section mb-2" id="faceRegisterSection">
-        <p class="face-step-section-title mb-1">Langkah 1 — Registrasi Wajah <span class="text-muted fw-normal">(sekali di awal, ulangi jika wajah berubah)</span></p>
-        <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
+        <p class="face-step-section-title mb-1">
+          {% if has_face_registered %}Pembaruan Data Wajah{% else %}Langkah Awal — Registrasi Wajah (5 Sampel Terarah){% endif %}
+        </p>
+        <div class="d-flex flex-wrap align-items-center gap-3">
           <div class="face-registered-photo-wrap" id="faceRegisteredPhotoWrap">
             <img id="faceRegisteredPhoto" class="face-registered-photo d-none" alt="Foto wajah terdaftar">
-            <div class="face-registered-photo-placeholder" id="faceRegisteredPhotoPlaceholder">Belum ada foto</div>
+            <div class="face-registered-photo-placeholder" id="faceRegisteredPhotoPlaceholder">Belum ada</div>
           </div>
-          <div class="d-flex flex-wrap gap-2 face-action-wrap">
-            <button type="button" class="btn btn-primary" id="btnRegisterFace">{{ 'Update Registrasi Wajah' if has_face_registered else 'Registrasi Wajah' }}</button>
+          <div class="flex-grow-1">
+            <button type="button" class="btn {% if has_face_registered %}btn-outline-primary btn-sm{% else %}btn-primary w-100 py-2 fw-semibold{% endif %}" id="btnRegisterFace">
+              {{ 'Perbarui Registrasi Wajah (5 Sampel)' if has_face_registered else 'Mulai Registrasi Wajah (5 Sampel)' }}
+            </button>
+            <p class="small text-muted mb-0 mt-1">
+              {% if has_face_registered %}
+                Gunakan jika pencahayaan atau penampilan wajah berubah signifikan.
+              {% else %}
+                Sistem akan memandu 5 pengambilan sampel wajah dengan jeda agar akurasi pengenalan tinggi.
+              {% endif %}
+            </p>
           </div>
         </div>
-        {% if has_face_registered %}
-        <p class="small text-success mb-0">Wajah Anda sudah terdaftar. Silakan lanjut ke Langkah 2 untuk absensi.</p>
-        {% else %}
-        <p class="small text-warning mb-0">Wajah belum terdaftar. Selesaikan langkah ini dulu sebelum bisa absen.</p>
-        {% endif %}
       </div>
 
-      <div class="face-step-section mb-2" id="faceAttendanceSection">
-        <p class="face-step-section-title mb-1">Langkah 2 — Absensi Harian (Check-in / Check-out)</p>
-        <div class="d-flex flex-wrap gap-2 mb-2 face-action-wrap">
-          <button type="button" class="btn btn-success" id="btnCheckinFace" {% if not has_face_registered %}disabled title="Registrasi wajah dulu sebelum bisa check-in"{% endif %}>Check-in Wajah</button>
-          <button type="button" class="btn btn-warning" id="btnCheckoutFace" {% if not has_face_registered %}disabled title="Registrasi wajah dulu sebelum bisa check-out"{% endif %}>Check-out Wajah</button>
-        </div>
-      </div>
-      <div id="faceResult" class="alert alert-secondary small mb-0">Kamera belum aktif.</div>
+      <div id="faceResult" class="alert alert-secondary small mb-0 mt-2">Siap. Tekan tombol di atas untuk memulai dengan jeda panduan.</div>
 
       <div id="faceSuccessEnding" class="face-success-ending d-none mt-2" aria-live="polite">
         <div class="face-success-head">
@@ -222,34 +228,71 @@
           <span id="faceSuccessAutoHide">Panel ini menutup otomatis dalam beberapa detik.</span>
         </div>
         <div class="d-flex gap-2 mt-3">
-          <button type="button" class="btn btn-success" id="btnFaceFinish">Selesai</button>
+          <button type="button" class="btn btn-success" id="btnFaceFinish">Ke Dashboard</button>
           <button type="button" class="btn btn-outline-secondary" id="btnFaceReload">Muat Ulang Riwayat</button>
         </div>
       </div>
       <button type="button" class="btn btn-sm btn-outline-success d-none mt-2" id="btnFaceShowEnding">Tampilkan Ringkasan Absensi Terakhir</button>
-
-      <div id="livenessHint" class="liveness-hint d-none mt-2" aria-live="polite">
-        <div class="d-flex align-items-center gap-2 mb-1">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="12" rx="10" ry="6"/><circle cx="12" cy="12" r="3"/></svg>
-          <span id="livenessHintText" class="fw-semibold small">Kedipkan mata atau gerakkan kepala sedikit…</span>
-        </div>
-        <div class="liveness-progress-wrap">
-          <div id="livenessProgressBar" class="liveness-progress-fill" style="width:0%"></div>
-        </div>
-      </div>
     </div>
   </div>
 </section>
 {% endif %}
 
+<section class="panel-card page-hero page-hero-attendance mb-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+    <div class="hero-title-wrap">
+      <span class="hero-glyph" aria-hidden="true">
+        <svg viewBox="0 0 24 24" role="img" focusable="false" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+          <path d="M8 3v4"></path>
+          <path d="M16 3v4"></path>
+          <path d="M3 10h18"></path>
+          <path d="M10 15l2 2 4-4"></path>
+        </svg>
+      </span>
+      <div>
+        <h5 class="mb-0">Ringkasan {{ attendance_page_title }}</h5>
+      </div>
+    </div>
+    <span class="summary-badge">{{ attendance|length }} data</span>
+  </div>
+  <div class="row g-2 mt-2 mini-metric-row">
+    <div class="col-6 col-sm-3">
+      <div class="mini-metric mini-metric-high">
+        <span class="mini-metric-label">Hadir</span>
+        <strong class="mini-metric-value">{{ attendance_stats.hadir }}</strong>
+      </div>
+    </div>
+    <div class="col-6 col-sm-3">
+      <div class="mini-metric mini-metric-low">
+        <span class="mini-metric-label">Terlambat</span>
+        <strong class="mini-metric-value">{{ attendance_stats.terlambat }}</strong>
+      </div>
+    </div>
+    <div class="col-6 col-sm-3">
+      <div class="mini-metric mini-metric-mid">
+        <span class="mini-metric-label">Izin</span>
+        <strong class="mini-metric-value">{{ attendance_stats.izin }}</strong>
+      </div>
+    </div>
+    <div class="col-6 col-sm-3">
+      <div class="mini-metric mini-metric-neutral">
+        <span class="mini-metric-label">Lainnya</span>
+        <strong class="mini-metric-value">{{ attendance_stats.other }}</strong>
+      </div>
+    </div>
+  </div>
+</section>
+
 {% if can_manage_attendance %}
 <section class="panel-card mb-3 panel-elevated">
-  <h5>Absensi Manual</h5>
+  <h5>Input Absensi Manual (Admin / Pembimbing)</h5>
   <form id="manualAttendanceForm" method="post" class="row g-2 mt-1">
-    <div class="col-lg-4">
+    <div class="col-lg-5">
       <select class="form-select" name="user_id" required>
         {% for user in users %}
-        <option value="{{ user.id }}">{{ user.username }}</option>
+        {% set p_opt = (participant_map or {}).get(user.id) %}
+        <option value="{{ user.id }}">{{ p_opt.nama_lengkap if p_opt else user.username }}{% if p_opt and p_opt.bidang %} ({{ p_opt.bidang }}){% endif %} — @{{ user.username }}</option>
         {% endfor %}
       </select>
     </div>
@@ -258,15 +301,20 @@
         <option value="hadir">Hadir</option>
         <option value="terlambat">Terlambat</option>
         <option value="izin">Izin</option>
+        <option value="sakit">Sakit</option>
+        <option value="alpa">Alpa</option>
       </select>
     </div>
-    <div class="col-lg-4"><button class="btn btn-primary w-100">Simpan</button></div>
+    <div class="col-lg-3"><button class="btn btn-primary w-100">Simpan</button></div>
   </form>
 </section>
 {% endif %}
 
 <section class="panel-card panel-elevated">
-  <h5>Riwayat Absensi</h5>
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h5 class="mb-0">Riwayat Absensi</h5>
+    <a href="/attendance/calendar" class="btn btn-sm btn-outline-secondary">Buka Kalender Absensi</a>
+  </div>
   {% if can_manage_attendance %}
   <div class="d-flex flex-wrap gap-2 mt-2 mb-2">
     <a href="/attendance" class="btn btn-sm {% if review_filter == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">Semua</a>
@@ -282,7 +330,7 @@
       <thead>
         <tr>
           <th>#</th>
-          {% if can_manage_attendance %}<th>Pengguna</th>{% endif %}
+          {% if can_manage_attendance %}<th>Peserta &amp; Bidang</th>{% endif %}
           <th>Tanggal</th>
           <th>Check-in</th>
           <th>Check-out</th>
@@ -293,9 +341,18 @@
       <tbody>
         {% for item in attendance %}
         {% set status = (item.status or '')|lower %}
+        {% set p_row = (participant_map or {}).get(item.user_id) %}
         <tr>
           <td>{{ item.id }}</td>
-          {% if can_manage_attendance %}<td>{{ item.user.username if item.user else ('User ' ~ item.user_id) }}</td>{% endif %}
+          {% if can_manage_attendance %}
+          <td>
+            <div class="fw-semibold">{{ p_row.nama_lengkap if p_row else (item.user.username if item.user else ('User ' ~ item.user_id)) }}</div>
+            <small class="text-muted">
+              @{{ item.user.username if item.user else item.user_id }}
+              {% if p_row and p_row.bidang %}• <span class="badge text-bg-info">{{ p_row.bidang }}</span>{% endif %}
+            </small>
+          </td>
+          {% endif %}
           <td>{{ item.attendance_date.strftime('%d/%m/%Y') if item.attendance_date else '-' }}</td>
           <td>{{ item.check_in_time.strftime('%H:%M') if item.check_in_time else '-' }}</td>
           <td>{{ item.check_out_time.strftime('%H:%M') if item.check_out_time else '-' }}</td>

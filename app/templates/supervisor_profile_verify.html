@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verifikasi Profil Pembimbing PKL — {{ supervisor.nama_lengkap }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='vendor/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+  <style>
+    body { background: #f8fafc; }
+    .sv-verify-card {
+      max-width: 720px;
+      margin: 2rem auto;
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      overflow: hidden;
+    }
+    .sv-verify-header {
+      background: linear-gradient(135deg, #065f46 0%, #059669 60%, #10b981 100%);
+      color: #fff;
+      padding: 1.5rem 1.75rem;
+    }
+    .sv-verify-body { padding: 1.75rem; }
+  </style>
+</head>
+<body>
+  <main class="container px-3">
+    <section class="sv-verify-card">
+      <div class="sv-verify-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <span class="badge text-bg-light text-success fw-bold mb-2">✓ BARCODE PEMBIMBING TERVERIFIKASI</span>
+          <h4 class="mb-0 fw-bold">{{ supervisor.nama_lengkap }}</h4>
+          <small class="opacity-75">Pembimbing Praktik Kerja Lapangan (PKL) — Diskominfo Kab. Batu Bara</small>
+        </div>
+        <img src="{{ qr_url }}" alt="QR Profil Pembimbing" width="84" height="84" class="rounded bg-white p-1 shadow-sm">
+      </div>
+
+      <div class="sv-verify-body">
+        <h6 class="text-uppercase text-muted fw-bold small mb-3">Identitas &amp; Penugasan Pembimbing</h6>
+        <div class="row g-3 mb-4">
+          <div class="col-sm-6">
+            <div class="p-3 rounded border bg-body-tertiary h-100">
+              <div class="small text-muted">Nama Lengkap Pembimbing</div>
+              <div class="fw-bold fs-6">{{ supervisor.nama_lengkap }}</div>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="p-3 rounded border bg-body-tertiary h-100">
+              <div class="small text-muted">NIP (Nomor Induk Pegawai)</div>
+              <div class="fw-bold fs-6">{{ supervisor.nip or '-' }}</div>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="p-3 rounded border bg-body-tertiary h-100">
+              <div class="small text-muted">Jabatan</div>
+              <div class="fw-semibold">{{ supervisor.jabatan or '-' }}</div>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="p-3 rounded border bg-body-tertiary h-100">
+              <div class="small text-muted">Bidang Penempatan Bimbingan</div>
+              <div>
+                {% if supervisor.bidang %}
+                <span class="badge text-bg-info fs-6">{{ supervisor.bidang }}</span>
+                {% else %}
+                <span class="text-muted">Semua Bidang</span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+          <h6 class="text-uppercase text-muted fw-bold small mb-0">Daftar Peserta Bimbingan di Bidang {{ supervisor.bidang or 'Ini' }}</h6>
+          <span class="badge text-bg-success">{{ signed_journals_count }} Jurnal Telah Disahkan</span>
+        </div>
+
+        {% if participants_in_bidang %}
+        <div class="table-responsive mb-3">
+          <table class="table table-sm table-bordered align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>No</th>
+                <th>Nama Peserta PKL</th>
+                <th>Asal Sekolah / Kampus</th>
+                <th>Jurusan</th>
+                <th>Masa PKL</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in participants_in_bidang %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td class="fw-semibold">{{ p.nama_lengkap }}</td>
+                <td>{{ p.instansi or '-' }}</td>
+                <td>{{ p.jurusan or '-' }}</td>
+                <td class="small">
+                  {% if p.tanggal_mulai and p.tanggal_selesai %}
+                    {{ p.tanggal_mulai.strftime('%d/%m/%Y') }} – {{ p.tanggal_selesai.strftime('%d/%m/%Y') }}
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted small mb-3">Belum ada peserta terdaftar di bidang ini.</p>
+        {% endif %}
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 pt-3 border-top small text-muted">
+          <span>Diverifikasi pada: {{ verified_at.strftime('%d/%m/%Y %H:%M:%S') }} WIB</span>
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="window.print()">Cetak Bukti</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
+

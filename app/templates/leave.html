@@ -3,9 +3,28 @@
 {% block page_title %}Permohonan Izin PKL{% endblock %}
 
 {% block content %}
+{% if bidang_scope and bidang_scope.is_supervisor %}
+<section class="panel-card mb-3 py-2 px-3 d-flex justify-content-between align-items-center flex-wrap gap-2" style="background:var(--accent-light);border-color:var(--accent)">
+  <div class="small">
+    <strong>Filter Bidang Pembimbing:</strong>
+    {% if bidang_scope.supervisor_bidang %}
+      Menampilkan permohonan izin peserta bidang <span class="badge text-bg-primary">{{ bidang_scope.supervisor_bidang }}</span>
+    {% else %}
+      <span class="text-muted">Bidang pembimbing belum diatur Admin — menampilkan seluruh peserta.</span>
+    {% endif %}
+  </div>
+  {% if bidang_scope.supervisor_bidang %}
+  <div class="btn-group btn-group-sm">
+    <a href="/leave?scope=bidang" class="btn {% if bidang_scope.scope == 'bidang' %}btn-primary{% else %}btn-outline-primary{% endif %}">Bidang Saya ({{ bidang_scope.supervisor_bidang }})</a>
+    <a href="/leave?scope=all" class="btn {% if bidang_scope.scope == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">Semua Bidang</a>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
 {% if current_user.role == 'peserta' %}
 <section class="panel-card mb-3 panel-elevated">
-  <h5>Ajukan Permohonan Izin</h5>
+  <h5>Ajukan Permohonan Izin / Sakit</h5>
   <form method="post" action="/leave" class="row g-2 mt-1">
     <div class="col-lg-3">
       <label class="form-label">Tanggal Izin</label>
@@ -20,7 +39,7 @@
     </div>
     <div class="col-lg-5">
       <label class="form-label">Keterangan</label>
-      <input class="form-control" name="keterangan" placeholder="Alasan izin..." required>
+      <input class="form-control" name="keterangan" placeholder="Alasan izin / sakit..." required>
     </div>
     <div class="col-lg-2 d-flex align-items-end">
       <button class="btn btn-primary w-100">Ajukan</button>
@@ -30,13 +49,13 @@
 {% endif %}
 
 <section class="panel-card panel-elevated">
-  <h5>{% if can_manage %}Semua Permohonan Izin{% else %}Permohonan Izin Saya{% endif %}</h5>
+  <h5>{% if can_manage %}Daftar Permohonan Izin Peserta{% else %}Permohonan Izin Saya{% endif %}</h5>
   <div class="table-responsive mt-2">
     <table class="table table-hover align-middle">
       <thead>
         <tr>
           <th>#</th>
-          {% if can_manage %}<th>Peserta</th>{% endif %}
+          {% if can_manage %}<th>Peserta &amp; Bidang</th>{% endif %}
           <th>Tanggal</th>
           <th>Jenis</th>
           <th>Keterangan</th>
@@ -47,9 +66,18 @@
       </thead>
       <tbody>
         {% for leave in leaves %}
+        {% set p_info = (participant_map or {}).get(leave.user_id) %}
         <tr>
           <td>{{ leave.id }}</td>
-          {% if can_manage %}<td>{{ leave.user.username if leave.user else leave.user_id }}</td>{% endif %}
+          {% if can_manage %}
+          <td>
+            <div class="fw-semibold">{{ p_info.nama_lengkap if p_info else (leave.user.username if leave.user else leave.user_id) }}</div>
+            <small class="text-muted">
+              @{{ leave.user.username if leave.user else leave.user_id }}
+              {% if p_info and p_info.bidang %}• <span class="badge text-bg-info">{{ p_info.bidang }}</span>{% endif %}
+            </small>
+          </td>
+          {% endif %}
           <td>{{ leave.tanggal.strftime('%d/%m/%Y') if leave.tanggal else '-' }}</td>
           <td><span class="badge {% if leave.jenis == 'sakit' %}text-bg-danger{% else %}text-bg-info{% endif %}">{{ leave.jenis or 'izin' }}</span></td>
           <td>{{ leave.keterangan }}</td>
@@ -64,11 +92,11 @@
             {% if leave.status == 'pending' %}
             <form method="post" action="/leave/{{ leave.id }}/review" class="d-flex gap-1">
               <input class="form-control form-control-sm" name="catatan" placeholder="Catatan..." style="max-width:140px">
-              <button class="btn btn-sm btn-success" name="action" value="approved">✓</button>
-              <button class="btn btn-sm btn-danger" name="action" value="rejected">✗</button>
+              <button class="btn btn-sm btn-success" name="action" value="approved" title="Setujui">✓ Setujui</button>
+              <button class="btn btn-sm btn-danger" name="action" value="rejected" title="Tolak">✗ Tolak</button>
             </form>
             {% else %}
-            <span class="text-muted small">{{ leave.reviewer.username if leave.reviewer else '-' }}</span>
+            <span class="text-muted small">Oleh: {{ leave.reviewer.username if leave.reviewer else '-' }}</span>
             {% endif %}
           </td>
           {% endif %}

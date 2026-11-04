@@ -1,5 +1,7 @@
+from collections.abc import Iterator
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from app.config import settings
 
@@ -21,4 +23,17 @@ else:
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+
+def get_db() -> Iterator[Session]:
+    """FastAPI dependency yielding a request-scoped session.
+
+    Single shared implementation for every router (audit finding F-20) with a
+    correct generator return type.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
  

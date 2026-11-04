@@ -5,13 +5,44 @@
 
 {% block content %}
 
+{% if bidang_scope and bidang_scope.is_supervisor and bidang_scope.supervisor_bidang %}
+<div class="alert alert-info d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <strong>Bidang Pembimbing: {{ bidang_scope.supervisor_bidang }}</strong>
+    <span class="small d-block text-muted">
+      {% if bidang_scope.scope == 'bidang' %}
+        Menampilkan peserta yang ditempatkan di bidang <strong>{{ bidang_scope.supervisor_bidang }}</strong>.
+        {% if bidang_scope.unassigned_count %}({{ bidang_scope.unassigned_count }} peserta belum memiliki bidang — klik "Lihat Semua Peserta" untuk mengatur bidangnya).{% endif %}
+      {% else %}
+        Menampilkan seluruh peserta lintas bidang.
+      {% endif %}
+    </span>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/participants?scope=bidang" class="btn btn-sm {% if bidang_scope.scope == 'bidang' %}btn-primary{% else %}btn-outline-primary{% endif %}">Bidang Saya ({{ bidang_scope.supervisor_bidang }})</a>
+    <a href="/participants?scope=all" class="btn btn-sm {% if bidang_scope.scope == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">Lihat Semua Peserta</a>
+  </div>
+</div>
+{% endif %}
+
+<datalist id="institutionOptions">
+  {% for name in institution_names %}
+  <option value="{{ name }}">
+  {% endfor %}
+</datalist>
+<datalist id="bidangOptions">
+  {% for b in bidang_options or [] %}
+  <option value="{{ b }}">
+  {% endfor %}
+</datalist>
+
 {% if users_without_profile %}
 <section class="panel-card mb-3" style="border-left:4px solid #f59e0b">
   <div class="d-flex justify-content-between align-items-center mb-2">
     <h5 class="mb-0">Peserta Belum Isi Profil PKL</h5>
     <span class="badge text-bg-warning">{{ users_without_profile|length }} akun</span>
   </div>
-  <p class="text-muted small mb-2">Akun berikut sudah terdaftar tapi belum melengkapi data nama, jurusan, dan instansi.</p>
+  <p class="text-muted small mb-2">Akun berikut sudah terdaftar tapi belum melengkapi data nama, jurusan, instansi, dan bidang penempatan.</p>
   {% if can_manage_password %}
   <div class="d-flex flex-column gap-2">
     {% for u in users_without_profile %}
@@ -22,9 +53,10 @@
       </div>
       <div class="row g-2">
         <form method="post" action="/participants/complete-profile/{{ u.id }}" class="col-lg-8 row g-2">
-          <div class="col-md-4"><input class="form-control form-control-sm" name="nama_lengkap" placeholder="Nama lengkap" required></div>
+          <div class="col-md-3"><input class="form-control form-control-sm" name="nama_lengkap" placeholder="Nama lengkap" required></div>
           <div class="col-md-3"><input class="form-control form-control-sm" name="jurusan" placeholder="Jurusan"></div>
-          <div class="col-md-5"><input class="form-control form-control-sm" name="instansi" placeholder="Instansi" list="institutionOptions" required></div>
+          <div class="col-md-3"><input class="form-control form-control-sm" name="instansi" placeholder="Instansi" list="institutionOptions" required></div>
+          <div class="col-md-3"><input class="form-control form-control-sm" name="bidang" placeholder="Bidang PKL" list="bidangOptions"></div>
           <div class="col-md-6"><input class="form-control form-control-sm" type="date" name="tanggal_mulai" title="Tanggal mulai PKL" required></div>
           <div class="col-md-6"><input class="form-control form-control-sm" type="date" name="tanggal_selesai" title="Tanggal selesai PKL" required></div>
           <div class="col-12"><button class="btn btn-sm btn-primary" type="submit">Buat Profil Peserta</button></div>
@@ -58,15 +90,9 @@
   <form method="post" class="row g-2 mt-1">
     <div class="col-lg-3"><input class="form-control" name="nama_lengkap" placeholder="Nama lengkap" required></div>
     <div class="col-lg-2"><input class="form-control" name="jurusan" placeholder="Jurusan"></div>
-    <div class="col-lg-3"><input class="form-control" name="instansi" placeholder="Instansi" list="institutionOptions"></div>
-    <div class="col-lg-2"><input class="form-control" type="date" name="tanggal_mulai" title="Tanggal mulai PKL" required></div>
-    <div class="col-lg-2"><input class="form-control" type="date" name="tanggal_selesai" title="Tanggal selesai PKL" required></div>
-    <datalist id="institutionOptions">
-      {% for name in institution_names %}
-      <option value="{{ name }}">
-      {% endfor %}
-    </datalist>
-    <div class="col-lg-2">
+    <div class="col-lg-2"><input class="form-control" name="instansi" placeholder="Instansi" list="institutionOptions"></div>
+    <div class="col-lg-2"><input class="form-control" name="bidang" placeholder="Bidang Penempatan" list="bidangOptions" value="{{ bidang_scope.supervisor_bidang if bidang_scope and bidang_scope.supervisor_bidang else '' }}"></div>
+    <div class="col-lg-3">
       <select class="form-select" name="user_id" required>
         {% for user in users %}
         <option value="{{ user.id }}">{{ user.username }}</option>
@@ -75,6 +101,8 @@
         {% endfor %}
       </select>
     </div>
+    <div class="col-lg-3"><input class="form-control" type="date" name="tanggal_mulai" title="Tanggal mulai PKL" required></div>
+    <div class="col-lg-3"><input class="form-control" type="date" name="tanggal_selesai" title="Tanggal selesai PKL" required></div>
     <div class="col-lg-2"><button class="btn btn-primary w-100">Simpan</button></div>
   </form>
 </section>
@@ -87,8 +115,9 @@
         <tr>
           <th>#</th>
           <th>Nama</th>
+          <th>Bidang Penempatan</th>
           <th>Jurusan</th>
-          <th>Instansi</th>
+          <th>Instansi Asal</th>
           <th>Periode PKL</th>
           {% if can_manage_password %}<th>Akun</th><th>Kontrol Password</th><th>Sesi</th>{% endif %}
         </tr>
@@ -98,22 +127,30 @@
         <tr>
           <td>{{ participant.id }}</td>
           <td>
-            {{ participant.nama_lengkap }}
+            <span class="fw-semibold">{{ participant.nama_lengkap }}</span>
             {% if participant.user %}
             <br>
-            <button class="btn btn-sm btn-outline-primary mt-1" type="button" data-bs-toggle="collapse" data-bs-target="#editParticipant{{ participant.id }}" aria-expanded="false">Edit Profil</button>
-            <a href="/api/reports/peserta/{{ participant.user.id }}/pdf" class="btn btn-sm btn-outline-secondary mt-1" target="_blank">Laporan</a>
-            <a href="/api/reports/peserta/{{ participant.user.id }}/sertifikat" class="btn btn-sm btn-outline-success mt-1" target="_blank">Sertifikat</a>
+            <button class="btn btn-sm btn-outline-primary mt-1" type="button" data-bs-toggle="collapse" data-bs-target="#editParticipant{{ participant.id }}" aria-expanded="false">Edit Profil &amp; Bidang</button>
+            <a href="/api/reports/peserta/{{ participant.user.id }}/pdf" class="btn btn-sm btn-outline-secondary mt-1" target="_blank">Laporan PDF</a>
             <div class="collapse mt-2" id="editParticipant{{ participant.id }}">
               <form method="post" action="/participants/{{ participant.id }}/edit" class="d-flex flex-column gap-1 p-2 rounded border bg-body-tertiary">
                 <input class="form-control form-control-sm" name="nama_lengkap" value="{{ participant.nama_lengkap }}" placeholder="Nama lengkap" required>
                 <input class="form-control form-control-sm" name="jurusan" value="{{ participant.jurusan or '' }}" placeholder="Jurusan">
                 <input class="form-control form-control-sm" name="instansi" value="{{ participant.instansi or '' }}" placeholder="Instansi" list="institutionOptions">
+                <input class="form-control form-control-sm" name="bidang" value="{{ participant.bidang or '' }}" placeholder="Bidang Penempatan" list="bidangOptions">
                 <button class="btn btn-sm btn-primary" type="submit">Simpan Profil</button>
               </form>
             </div>
             {% endif %}
-          </td>          <td>{{ participant.jurusan or '-' }}</td>
+          </td>
+          <td>
+            {% if participant.bidang %}
+            <span class="badge text-bg-info">{{ participant.bidang }}</span>
+            {% else %}
+            <span class="badge text-bg-light border text-muted">Belum diatur</span>
+            {% endif %}
+          </td>
+          <td>{{ participant.jurusan or '-' }}</td>
           <td>{{ participant.instansi or '-' }}</td>
           <td>
             {% if participant.tanggal_mulai and participant.tanggal_selesai %}
@@ -163,10 +200,10 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="{{ 8 if can_manage_password else 5 }}" class="text-center">
+          <td colspan="{{ 9 if can_manage_password else 6 }}" class="text-center">
             <div class="empty-state py-2">
-              <p class="mb-1 fw-semibold">Belum ada data peserta.</p>
-              <small class="text-muted">Tambahkan peserta baru dari formulir di atas agar modul absensi, jurnal, dan penilaian dapat digunakan.</small>
+              <p class="mb-1 fw-semibold">Belum ada data peserta{% if bidang_scope and bidang_scope.active_bidang %} di bidang {{ bidang_scope.active_bidang }}{% endif %}.</p>
+              <small class="text-muted">Tambahkan peserta baru atau klik "Lihat Semua Peserta" untuk mengatur bidang penempatan peserta.</small>
             </div>
           </td>
         </tr>

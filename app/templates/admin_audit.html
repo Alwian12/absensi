@@ -1,31 +1,42 @@
 {% extends "layout.html" %}
-{% block title %}Audit Log Admin{% endblock %}
-{% block page_title %}Audit Log Admin{% endblock %}
+{% block title %}Audit Log Sistem{% endblock %}
+{% block page_title %}Audit Log Sistem{% endblock %}
 
 {% block content %}
-<section class="panel-card panel-elevated">
-  <h5>Riwayat Tindakan Admin</h5>
-  <p class="text-muted mb-2">Setiap aksi sensitif admin dicatat secara otomatis untuk kebutuhan audit.</p>
+<section class="panel-card panel-elevated mb-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+    <div>
+      <h5 class="mb-0">Riwayat Audit Tindakan Admin</h5>
+      <p class="text-muted small mb-0">Mencatat seluruh aksi sensitif admin (manajemen akun, reset password, force logout, dan backup database).</p>
+    </div>
+    <span class="badge text-bg-light border">{{ logs|length }} entri</span>
+  </div>
   <div class="table-responsive mt-2">
-    <table class="table table-hover align-middle small">
+    <table class="table table-hover align-middle small mb-0">
       <thead>
         <tr>
-          <th>#</th><th>Waktu</th><th>Admin</th><th>Aksi</th><th>Target</th><th>Detail</th><th>IP</th>
+          <th>#</th>
+          <th>Waktu</th>
+          <th>Admin</th>
+          <th>Aksi</th>
+          <th>Target Akun</th>
+          <th>Detail</th>
+          <th>IP Address</th>
         </tr>
       </thead>
       <tbody>
         {% for log in logs %}
         <tr>
           <td>{{ log.id }}</td>
-          <td class="text-muted">{{ log.created_at.strftime('%d/%m/%Y %H:%M') if log.created_at else '-' }}</td>
-          <td>{{ log.admin.username if log.admin else log.admin_user_id }}</td>
-          <td><span class="badge text-bg-light border text-capitalize">{{ log.action }}</span></td>
+          <td class="text-muted text-nowrap">{{ log.created_at.strftime('%d/%m/%Y %H:%M') if log.created_at else '-' }}</td>
+          <td class="fw-semibold">{{ log.admin.username if log.admin else log.admin_user_id }}</td>
+          <td><span class="badge text-bg-light border">{{ log.action | replace('_', ' ') | title }}</span></td>
           <td>{{ log.target.username if log.target else (log.target_user_id or '-') }}</td>
           <td class="text-muted">{{ log.detail or '-' }}</td>
-          <td class="text-muted">{{ log.ip or '-' }}</td>
+          <td class="text-muted"><code>{{ log.ip or '-' }}</code></td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="text-center text-muted">Belum ada log audit.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted py-3">Belum ada catatan audit admin.</td></tr>
         {% endfor %}
       </tbody>
     </table>

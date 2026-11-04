@@ -4,9 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Login — Monitoring PKL Diskominfo</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="/static/vendor/fonts.css" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -180,6 +178,20 @@
       display: flex;
       align-items: flex-start;
       gap: .5rem;
+    }
+
+    .alert-success {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      color: #166534;
+      border-radius: 10px;
+      padding: .85rem 1rem;
+      font-size: .855rem;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: flex-start;
+      gap: .6rem;
+      box-shadow: 0 2px 8px rgba(22, 163, 74, .1);
     }
 
     /* Floating label inputs */
@@ -384,6 +396,16 @@
       <h2 class="form-headline">Selamat datang 👋</h2>
       <p class="form-sub">Masuk dengan akun resmi Anda untuk mengakses dasbor.</p>
 
+      {% if success %}
+      <div class="alert-success" role="status">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <div>
+          <strong style="display:block;margin-bottom:2px">Pendaftaran Berhasil!</strong>
+          <span>{{ success }}</span>
+        </div>
+      </div>
+      {% endif %}
+
       {% if error %}
       <div class="alert-error">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -393,7 +415,7 @@
 
       <form method="post" id="loginForm">
         <div class="input-float">
-          <input type="text" name="email" id="loginEmail" placeholder=" " required autocomplete="username">
+          <input type="text" name="email" id="loginEmail" placeholder=" " required autocomplete="username" value="{{ identifier or '' }}">
           <label for="loginEmail">Username atau Email</label>
         </div>
         <div class="input-float">
@@ -437,7 +459,7 @@
     }
     // CSRF auto-inject
     document.addEventListener("DOMContentLoaded", function() {
-      var t = document.cookie.split("; ").find(function(r){ return r.startsWith("csrf_token="); });
+      var t = document.cookie.split("; ").find(function(r){ return r.startsWith("csrf_token_v2="); });
       if (t) {
         t = t.split("=")[1];
         document.querySelectorAll("form").forEach(function(f) {

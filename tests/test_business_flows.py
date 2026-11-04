@@ -22,7 +22,8 @@ from app.models.participant import Participant
 from app.models.supervisor import Supervisor
 from app.models.user import User
 from app.routers import web as web_router
-from app.security.csrf import generate_csrf_token
+from app.security.csrf import CSRF_COOKIE_NAME, generate_csrf_token
+from app.security.session import SESSION_COOKIE, create_session_token
 from app.services.scheduler import apply_automatic_absence_for_date
 
 
@@ -43,6 +44,11 @@ def _create_user(*, role: str) -> User:
         return user
     finally:
         db.close()
+
+
+def _login_as(client: TestClient, user: User) -> None:
+    """Authenticate a test client with a signed session cookie (legacy user_id cookie is rejected)."""
+    client.cookies.set(SESSION_COOKIE, create_session_token(user.id, user.session_version or 1))
 
 
 def _get_setting_value(db, key: str) -> str | None:
@@ -68,12 +74,16 @@ def provide_csrf_for_form_posts(monkeypatch):
     original_post = TestClient.post
 
     def post_with_csrf(client, *args, **kwargs):
+        token = generate_csrf_token()
+        client.cookies.set(CSRF_COOKIE_NAME, token)
         if "json" not in kwargs:
-            token = generate_csrf_token()
-            client.cookies.set("csrf_token", token)
             form_data = dict(kwargs.get("data") or {})
             form_data.setdefault("csrf_token", token)
             kwargs["data"] = form_data
+        else:
+            headers = dict(kwargs.get("headers") or {})
+            headers.setdefault("X-CSRF-Token", token)
+            kwargs["headers"] = headers
         return original_post(client, *args, **kwargs)
 
     monkeypatch.setattr(TestClient, "post", post_with_csrf)
@@ -156,7 +166,7 @@ def test_admin_can_update_attendance_settings() -> None:
     db.close()
 
     try:
-        client.cookies.set("user_id", str(admin.id))
+        _login_as(client, admin)
         response = client.post(
             "/admin/attendance-settings",
             data={
@@ -217,7 +227,7 @@ def test_admin_can_update_office_geofence() -> None:
     db.close()
 
     try:
-        client.cookies.set("user_id", str(admin.id))
+        _login_as(client, admin)
         response = client.post(
             "/admin/office-geofence",
             data={
@@ -276,7 +286,7 @@ def test_admin_attendance_settings_reject_invalid_time_format() -> None:
     admin = _create_user(role="admin")
 
     try:
-        client.cookies.set("user_id", str(admin.id))
+        _login_as(client, admin)
         response = client.post(
             "/admin/attendance-settings",
             data={
@@ -299,7 +309,7 @@ def test_admin_attendance_settings_reject_invalid_time_order() -> None:
     admin = _create_user(role="admin")
 
     try:
-        client.cookies.set("user_id", str(admin.id))
+        _login_as(client, admin)
         response = client.post(
             "/admin/attendance-settings",
             data={
@@ -322,7 +332,7 @@ def test_admin_attendance_settings_reject_invalid_transition_style() -> None:
     admin = _create_user(role="admin")
 
     try:
-        client.cookies.set("user_id", str(admin.id))
+        _login_as(client, admin)
         response = client.post(
             "/admin/attendance-settings",
             data={
@@ -345,7 +355,7 @@ def test_admin_attendance_settings_reject_invalid_auto_hide_range() -> None:
     admin = _create_user(role="admin")
 
     try:
-        client.cookies.set("user_id", str(admin.id))
+        _login_as(client, admin)
         response = client.post(
             "/admin/attendance-settings",
             data={
@@ -430,7 +440,7 @@ def test_checkout_before_jam_pulang_stores_reason(monkeypatch) -> None:
     db.close()
 
     try:
-        client.cookies.set("user_id", str(peserta.id))
+        _login_as(client, peserta)
 
         checkin_resp = client.post(
             "/api/face/verify",
@@ -545,7 +555,7 @@ def test_face_verify_rejects_when_outside_office_radius(monkeypatch) -> None:
     db.close()
 
     try:
-        client.cookies.set("user_id", str(peserta.id))
+        _login_as(client, peserta)
         response = client.post(
             "/api/face/verify",
             json={
@@ -632,7 +642,7 @@ def test_face_verify_rejects_when_gps_accuracy_too_low(monkeypatch) -> None:
     db.close()
 
     try:
-        client.cookies.set("user_id", str(peserta.id))
+        _login_as(client, peserta)
         response = client.post(
             "/api/face/verify",
             json={
@@ -720,7 +730,7 @@ def test_face_verify_within_grace_marks_review(monkeypatch) -> None:
     db.close()
 
     try:
-        client.cookies.set("user_id", str(peserta.id))
+        _login_as(client, peserta)
         response = client.post(
             "/api/face/verify",
             json={
@@ -825,7 +835,7 @@ def test_face_verify_uses_institution_geofence_override(monkeypatch) -> None:
     db.close()
 
     try:
-        client.cookies.set("user_id", str(peserta.id))
+        _login_as(client, peserta)
         response = client.post(
             "/api/face/verify",
             json={
@@ -914,7 +924,7 @@ def test_face_verify_flags_location_risk_for_impossible_jump(monkeypatch) -> Non
     db.close()
 
     try:
-        client.cookies.set("user_id", str(peserta.id))
+        _login_as(client, peserta)
         response = client.post(
             "/api/face/verify",
             json={
@@ -977,7 +987,7 @@ def test_admin_can_approve_and_reject_location_review_status() -> None:
     db.close()
 
     try:
-        client.cookies.set("user_id", str(admin.id))
+        _login_as(client, admin)
 
         approve_resp = client.post(
             f"/attendance/{attendance_id}/location-review",
@@ -1071,7 +1081,7 @@ def test_journal_signature_sign_and_verify_page() -> None:
     db.close()
 
     try:
-        client.cookies.set("user_id", str(pembimbing.id))
+        _login_as(client, pembimbing)
         sign_resp = client.post(f"/journal/{journal.id}/sign", follow_redirects=False)
         assert sign_resp.status_code == 303
         assert sign_resp.headers.get("location", "").startswith("/journal?success=")
@@ -1094,6 +1104,11 @@ def test_journal_signature_sign_and_verify_page() -> None:
         assert "Pembimbing Test" in verify_page.text
         assert "19880011" in verify_page.text
         assert "Koordinator PKL" in verify_page.text
+
+        qr_svg = client.get(f"/journal-signature/{token}/qr.svg")
+        assert qr_svg.status_code == 200
+        assert "image/svg+xml" in qr_svg.headers.get("content-type", "")
+        assert "<svg" in qr_svg.text
     finally:
         cleanup_db = SessionLocal()
         try:
@@ -1112,7 +1127,7 @@ def test_admin_reset_password_updates_target_password() -> None:
     target = _create_user(role="peserta")
 
     try:
-        client.cookies.set("user_id", str(admin.id))
+        _login_as(client, admin)
         response = client.post(
             f"/users/{target.id}/password",
             data={"new_password": "newsecret123", "redirect_to": "/dashboard"},
@@ -1142,12 +1157,11 @@ def test_admin_force_logout_invalidates_existing_session_version_cookie() -> Non
     old_session_ver = target.session_version or 1
 
     try:
-        user_client.cookies.set("user_id", str(target.id))
-        user_client.cookies.set("session_ver", str(old_session_ver))
+        _login_as(user_client, target)
         before = user_client.get("/dashboard", follow_redirects=False)
         assert before.status_code == 200
 
-        admin_client.cookies.set("user_id", str(admin.id))
+        _login_as(admin_client, admin)
         force_resp = admin_client.post(
             f"/users/{target.id}/force-logout",
             data={"redirect_to": "/dashboard"},
@@ -1161,3 +1175,108 @@ def test_admin_force_logout_invalidates_existing_session_version_cookie() -> Non
         assert after.headers.get("location") == "/login"
     finally:
         _cleanup_users([admin.id, target.id])
+
+
+def test_journal_revision_and_peserta_edit_flow() -> None:
+    pembimbing_client = TestClient(app)
+    peserta_client = TestClient(app)
+    pembimbing = _create_user(role="pembimbing")
+    peserta = _create_user(role="peserta")
+
+    db = SessionLocal()
+    journal = Journal(
+        user_id=peserta.id,
+        kegiatan="Menyusun draf awal laporan jaringan bidang Aptika.",
+        output="Draf v1",
+        status="pending",
+    )
+    db.add(journal)
+    db.commit()
+    db.refresh(journal)
+    journal_id = journal.id
+    db.close()
+
+    try:
+        _login_as(pembimbing_client, pembimbing)
+        rev_resp = pembimbing_client.post(
+            f"/journal/{journal_id}/comment",
+            data={"komentar": "Tambahkan detail topologi ruang server.", "status_review": "revisi"},
+            follow_redirects=False,
+        )
+        assert rev_resp.status_code == 303
+
+        verify_db = SessionLocal()
+        try:
+            j = verify_db.query(Journal).filter(Journal.id == journal_id).first()
+            assert j is not None
+            assert j.status == "revisi"
+            assert "topologi" in (j.komentar or "")
+        finally:
+            verify_db.close()
+
+        _login_as(peserta_client, peserta)
+        edit_resp = peserta_client.post(
+            f"/journal/{journal_id}/edit",
+            data={
+                "kegiatan": "Menyusun laporan jaringan bidang Aptika lengkap dengan topologi ruang server.",
+                "output": "Dokumen v2 selesai",
+            },
+            follow_redirects=False,
+        )
+        assert edit_resp.status_code == 303
+
+        verify_db2 = SessionLocal()
+        try:
+            j2 = verify_db2.query(Journal).filter(Journal.id == journal_id).first()
+            assert j2 is not None
+            assert j2.status == "pending"
+            assert "lengkap dengan topologi" in j2.kegiatan
+            assert j2.output == "Dokumen v2 selesai"
+        finally:
+            verify_db2.close()
+    finally:
+        cleanup_db = SessionLocal()
+        try:
+            cleanup_db.query(Journal).filter(Journal.id == journal_id).delete(synchronize_session=False)
+            cleanup_db.commit()
+        finally:
+            cleanup_db.close()
+        _cleanup_users([pembimbing.id, peserta.id])
+
+
+def test_supervisor_bidang_filtering_on_participants_and_journal() -> None:
+    client = TestClient(app)
+    pembimbing = _create_user(role="pembimbing")
+    peserta_aptika = _create_user(role="peserta")
+    peserta_ikp = _create_user(role="peserta")
+
+    db = SessionLocal()
+    db.add(Supervisor(user_id=pembimbing.id, nama_lengkap="Pembimbing Aptika", bidang="Aptika"))
+    db.add(Participant(user_id=peserta_aptika.id, nama_lengkap="Siswa Aptika Satu", bidang="Aptika"))
+    db.add(Participant(user_id=peserta_ikp.id, nama_lengkap="Siswa IKP Dua", bidang="IKP"))
+    db.commit()
+    db.close()
+
+    try:
+        _login_as(client, pembimbing)
+        resp_scoped = client.get("/participants")
+        assert resp_scoped.status_code == 200
+        assert "Siswa Aptika Satu" in resp_scoped.text
+        assert "Siswa IKP Dua" not in resp_scoped.text
+
+        resp_all = client.get("/participants?scope=all")
+        assert resp_all.status_code == 200
+        assert "Siswa Aptika Satu" in resp_all.text
+        assert "Siswa IKP Dua" in resp_all.text
+    finally:
+        cleanup_db = SessionLocal()
+        try:
+            cleanup_db.query(Participant).filter(
+                Participant.user_id.in_([peserta_aptika.id, peserta_ikp.id])
+            ).delete(synchronize_session=False)
+            cleanup_db.query(Supervisor).filter(Supervisor.user_id == pembimbing.id).delete(synchronize_session=False)
+            cleanup_db.commit()
+        finally:
+            cleanup_db.close()
+        _cleanup_users([pembimbing.id, peserta_aptika.id, peserta_ikp.id])
+
