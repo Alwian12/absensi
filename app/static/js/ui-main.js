@@ -1,4 +1,11 @@
 (function () {
+  // Expose a CSRF token reader so page scripts can attach the X-CSRF-Token header
+  // (audit finding F-05: cookie-auth POSTs now require CSRF validation).
+  window.getCsrfToken = function () {
+    const match = document.cookie.match(/(?:^|;\s*)csrf_token_v2=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : "";
+  };
+
   function ensureToastContainer() {
     let container = document.getElementById("appToastStack");
     if (container) {
@@ -266,6 +273,27 @@
     });
   }
 
+  // Sticky header gets a subtle elevation once the page is scrolled.
+  function setupHeaderScroll() {
+    const header = document.querySelector(".app-header");
+    if (!header) {
+      return;
+    }
+    let ticking = false;
+    const sync = () => {
+      header.classList.toggle("is-scrolled", window.scrollY > 8);
+      ticking = false;
+    };
+    window.addEventListener("scroll", () => {
+      if (ticking) {
+        return;
+      }
+      ticking = true;
+      window.requestAnimationFrame(sync);
+    }, { passive: true });
+    sync();
+  }
+
   const forms = document.querySelectorAll("form:not([data-no-loading])");
   forms.forEach((form) => {
     form.addEventListener("submit", () => {
@@ -281,6 +309,7 @@
   setupSidebarToggle();
   setupResponsiveTables();
   setupStaggerMotion();
+  setupHeaderScroll();
   showToastFromQueryString();
   setupNotifications();
   setupSidebarCollapse();
@@ -333,7 +362,10 @@ function setupNotifications() {
       el.addEventListener("click", function () {
         const id = el.dataset.id;
         if (!el.classList.contains("unread")) return;
-        fetch("/api/notifications/" + id + "/read", { method: "POST" }).then(function () {
+        fetch("/api/notifications/" + id + "/read", {
+          method: "POST",
+          headers: { "X-CSRF-Token": window.getCsrfToken() },
+        }).then(function () {
           el.classList.remove("unread");
           fetchNotifs();
         });
@@ -359,7 +391,10 @@ function setupNotifications() {
   if (readAllBtn) {
     readAllBtn.addEventListener("click", async function (e) {
       e.stopPropagation();
-      await fetch("/api/notifications/read-all", { method: "POST" });
+      await fetch("/api/notifications/read-all", {
+        method: "POST",
+        headers: { "X-CSRF-Token": window.getCsrfToken() },
+      });
       fetchNotifs();
       list.querySelectorAll(".notif-item.unread").forEach(function (el) { el.classList.remove("unread"); });
     });

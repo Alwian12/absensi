@@ -6,3 +6,9 @@ __pycache__/
 .pytest-last.txt
 *.tmp
 *.bak
+test.db
+app.db
+backups/*.sql
+*.sql.gz
+.ruff_cache/
+.mypy_cache/

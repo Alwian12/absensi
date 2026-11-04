@@ -41,3 +41,33 @@ def verify_journal_signature_token(token: str) -> tuple[int, int, int]:
         return int(journal_raw), int(supervisor_raw), int(ts_raw)
     except Exception as exc:
         raise ValueError("Payload token tidak valid") from exc
+
+
+def generate_supervisor_profile_token(supervisor_id: int) -> str:
+    payload = f"sv:{supervisor_id}".encode("utf-8")
+    secret = settings.jwt_secret_key.encode("utf-8")
+    digest = hmac.new(secret, payload, hashlib.sha256).digest()
+    return f"{_b64url_encode(payload)}.{_b64url_encode(digest)}"
+
+
+def verify_supervisor_profile_token(token: str) -> int:
+    try:
+        payload_part, sig_part = token.split(".", 1)
+    except ValueError as exc:
+        raise ValueError("Format token pembimbing tidak valid") from exc
+
+    payload = _b64url_decode(payload_part)
+    provided_sig = _b64url_decode(sig_part)
+    expected_sig = hmac.new(settings.jwt_secret_key.encode("utf-8"), payload, hashlib.sha256).digest()
+
+    if not hmac.compare_digest(provided_sig, expected_sig):
+        raise ValueError("Token pembimbing tidak valid")
+
+    try:
+        prefix, sv_raw = payload.decode("utf-8").split(":", 1)
+        if prefix != "sv":
+            raise ValueError("Prefix token tidak sesuai")
+        return int(sv_raw)
+    except Exception as exc:
+        raise ValueError("Payload token pembimbing tidak valid") from exc
+

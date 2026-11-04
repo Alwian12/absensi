@@ -12,6 +12,7 @@
   const commandSubtext = document.getElementById("faceCommandSubtext");
   const cameraShell = document.getElementById("attendanceCameraShell");
   const cameraIdlePrompt = document.getElementById("cameraIdlePrompt");
+  const cameraGuideLabel = document.getElementById("cameraGuideLabel");
   const stepNodes = document.querySelectorAll("[data-face-step]");
   const countdownOverlay = document.getElementById("faceCountdownOverlay");
   const countdownValue = document.getElementById("faceCountdownValue");
@@ -42,10 +43,21 @@
   let successAutoHideTick = null;
   let latestSuccessSnapshot = null;
 
-  // Multi-frame motion liveness: short enough for daily use while retaining motion checks.
-  const LIVENESS_FRAMES = 5;
-  const LIVENESS_INTERVAL_MS = 180;
-  const LIVENESS_THRESHOLD = 5.5;
+  // Human-paced multi-frame motion liveness (~2.5s window so users have time to blink/nod).
+  const LIVENESS_FRAMES = 8;
+  const LIVENESS_INTERVAL_MS = 310;
+  const LIVENESS_THRESHOLD = 3.8;
+
+  // Guided 5-pose registration so users can comfortably follow each step on mobile.
+  const REGISTER_SAMPLES = 5;
+  const REGISTER_SAMPLE_INTERVAL_MS = 850;
+  const REGISTER_POSE_PROMPTS = [
+    "Sampel 1/5: Hadap lurus ke kamera",
+    "Sampel 2/5: Tahan posisi wajah tetap stabil",
+    "Sampel 3/5: Miringkan sedikit kepala ke kiri",
+    "Sampel 4/5: Miringkan sedikit kepala ke kanan",
+    "Sampel 5/5: Hadap lurus kembali ke tengah",
+  ];
 
   const TRANSITION_STYLE_SCALE = {
     fast: 0.85,
@@ -68,16 +80,16 @@
 
   const SUCCESS_TRANSITION_CONFIG = {
     register: {
-      processingMs: 300,
-      revealMs: 350,
-      firstTitle: "Menyimpan data wajah...",
-      firstSub: "Profil wajah sedang diamankan untuk proses absensi berikutnya.",
+      processingMs: 350,
+      revealMs: 450,
+      firstTitle: "Menyimpan 5 sampel wajah...",
+      firstSub: "Profil biometrik wajah sedang diamankan untuk absensi.",
       secondTitle: "Registrasi selesai",
       secondSub: "Data wajah berhasil disimpan.",
     },
     checkin: {
-      processingMs: 250,
-      revealMs: 350,
+      processingMs: 300,
+      revealMs: 400,
       firstTitle: "Memproses check-in...",
       firstSub: "Sistem sedang memvalidasi dan menyimpan absensi masuk.",
       secondTitle: "Check-in berhasil",
@@ -108,45 +120,66 @@
   const GUIDE_STAGES = {
     idle: {
       badge: "Siap",
-      title: "Aktifkan kamera untuk mulai absensi.",
-      text: "Pastikan wajah terlihat jelas, pencahayaan cukup, dan kamera berada setinggi mata.",
+      title: "Tekan tombol Absen atau Registrasi untuk memulai.",
+      text: "Kamera akan aktif otomatis dan sistem memberi jeda persiapan sebelum mengambil gambar.",
       step: "camera",
       tone: "idle",
     },
     camera: {
       badge: "Kamera Aktif",
-      title: "Posisikan wajah di tengah frame panduan.",
-      text: "Jaga kepala tetap stabil 1-2 detik agar sistem bisa membaca kontur wajah dengan baik.",
+      title: "Posisikan wajah di tengah bingkai oval.",
+      text: "Pegang HP sejajar mata dengan pencahayaan cukup. Tahan posisi 1-2 detik.",
       step: "position",
       tone: "camera",
     },
     register: {
       badge: "Registrasi",
-      title: "Tahan posisi, sistem sedang menyimpan data wajah.",
-      text: "Wajah harus menghadap kamera langsung dan tidak tertutup masker atau bayangan berat.",
+      title: "Bersiap mengambil 5 sampel wajah terarah.",
+      text: "Ikuti aba-aba di layar dengan tenang. Sistem memberikan jeda pada setiap sampel.",
       step: "verify",
       tone: "verify",
     },
     checkin: {
       badge: "Check-in",
-      title: "Siapkan wajah untuk check-in.",
-      text: "Setelah liveness lolos, absensi masuk akan dikirim otomatis ke sistem.",
+      title: "Bersiap untuk absensi masuk (Check-in).",
+      text: "Posisikan wajah di tengah bingkai, ikuti hitung mundur dan gerakan liveness singkat.",
       step: "verify",
       tone: "verify",
     },
     checkout: {
       badge: "Check-out",
-      title: "Siapkan wajah untuk check-out.",
-      text: "Ikuti panduan gerakan singkat, lalu sistem akan memproses absensi pulang.",
+      title: "Bersiap untuk absensi pulang (Check-out).",
+      text: "Posisikan wajah di tengah bingkai, ikuti hitung mundur dan gerakan liveness singkat.",
       step: "verify",
       tone: "verify",
     },
     liveness: {
-      badge: "Liveness",
-      title: "Gerakkan kepala sedikit atau kedipkan mata sekarang.",
-      text: "Panel akan membaca perubahan gerak alami wajah untuk memastikan ini bukan foto statis.",
+      badge: "Uji Liveness",
+      title: "Kedipkan mata atau gerakkan kepala sedikit sekarang.",
+      text: "Sistem memberikan waktu sekitar 2,5 detik untuk membaca gerakan alami wajah Anda.",
       step: "liveness",
       tone: "liveness",
+    },
+    processing: {
+      badge: "Memproses",
+      title: "Wajah sedang diverifikasi oleh sistem.",
+      text: "Mohon tunggu sebentar, jangan menutup halaman atau mematikan kamera.",
+      step: "verify",
+      tone: "verify",
+    },
+    no_face: {
+      badge: "Wajah Belum Terdeteksi",
+      title: "Wajah belum terdeteksi oleh kamera.",
+      text: "Dekatkan wajah ke tengah bingkai oval, pastikan pencahayaan cukup, dan jangan menutupi wajah.",
+      step: "position",
+      tone: "error",
+    },
+    low_quality: {
+      badge: "Kualitas Belum Cukup",
+      title: "Kualitas gambar wajah belum memadai.",
+      text: "Tahan perangkat tetap stabil, hindari cahaya dari belakang (backlight), dan pastikan wajah tidak buram.",
+      step: "position",
+      tone: "error",
     },
     success: {
       badge: "Berhasil",
@@ -158,29 +191,98 @@
     error: {
       badge: "Perlu Ulang",
       title: "Absensi belum berhasil diverifikasi.",
-      text: "Periksa posisi wajah, pencahayaan, dan gerakan liveness lalu coba lagi.",
+      text: "Periksa posisi wajah, pencahayaan, dan ikuti jeda instruksi liveness lalu coba lagi.",
       step: "liveness",
       tone: "error",
     },
   };
 
+  // Map a server/client failure message to the most helpful guide stage.
+  function stageForError(message) {
+    const text = String(message || "").toLowerCase();
+    if (text.indexOf("tidak terdeteksi") !== -1 || text.indexOf("no face") !== -1) {
+      return "no_face";
+    }
+    if (
+      text.indexOf("terlalu kecil") !== -1 ||
+      text.indexOf("buram") !== -1 ||
+      text.indexOf("pencahayaan") !== -1 ||
+      text.indexOf("kualitas") !== -1 ||
+      text.indexOf("tidak konsisten") !== -1
+    ) {
+      return "low_quality";
+    }
+    if (text.indexOf("lebih dari satu wajah") !== -1) {
+      return "no_face";
+    }
+    return "error";
+  }
+
   function sleep(ms) {
     return new Promise(function (r) { setTimeout(r, ms); });
   }
 
-  function speakGuide(text) {
+  const SPEECH_RATE = 0.88;
+  const SPEECH_DEDUPE_MS = 1200;
+  let speechVoice = null;
+  let lastSpeech = { text: "", at: 0 };
+
+  function pickIndonesianVoice() {
+    if (!("speechSynthesis" in window)) {
+      return null;
+    }
+    const voices = window.speechSynthesis.getVoices() || [];
+    const indonesian = voices.filter(function (v) {
+      return String(v.lang || "").toLowerCase().indexOf("id") === 0;
+    });
+    if (!indonesian.length) {
+      return null;
+    }
+    return indonesian.find(function (v) { return v.localService; }) || indonesian[0];
+  }
+
+  if ("speechSynthesis" in window) {
+    speechVoice = pickIndonesianVoice();
+    window.speechSynthesis.addEventListener("voiceschanged", function () {
+      speechVoice = pickIndonesianVoice();
+    });
+  }
+
+  function speakGuide(text, options) {
     if (!text || !voiceGuideToggle || !voiceGuideToggle.checked || !("speechSynthesis" in window)) {
       return;
     }
+    const opts = options || {};
+    const now = Date.now();
+    if (!opts.force && text === lastSpeech.text && now - lastSpeech.at < SPEECH_DEDUPE_MS) {
+      return;
+    }
+    lastSpeech = { text: text, at: now };
     try {
-      window.speechSynthesis.cancel();
+      const synth = window.speechSynthesis;
+      if (!speechVoice) {
+        speechVoice = pickIndonesianVoice();
+      }
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = "id-ID";
-      utterance.rate = 1;
+      utterance.rate = typeof opts.rate === "number" ? opts.rate : SPEECH_RATE;
       utterance.pitch = 1;
-      window.speechSynthesis.speak(utterance);
+      utterance.volume = 1;
+      if (speechVoice) {
+        utterance.voice = speechVoice;
+      }
+      if (!opts.queue && (synth.speaking || synth.pending)) {
+        synth.cancel();
+      }
+      synth.speak(utterance);
     } catch (_) {
       // Ignore unsupported speech synthesis errors.
+    }
+  }
+
+  function setCameraOverlayLabel(text) {
+    if (cameraGuideLabel && text) {
+      cameraGuideLabel.textContent = text;
     }
   }
 
@@ -208,6 +310,7 @@
     if (cameraShell) {
       cameraShell.setAttribute("data-guide-stage", stage.tone);
     }
+    setCameraOverlayLabel(stage.title);
 
     if (overrides && overrides.speak) {
       speakGuide(stage.title);
@@ -256,23 +359,23 @@
     lastBrightness = avgLuma;
 
     if (avgLuma < 70) {
-      setQualityChip(qualityBrightness, "warn", "Cahaya: terlalu gelap, tambah pencahayaan");
-    } else if (avgLuma > 190) {
-      setQualityChip(qualityBrightness, "warn", "Cahaya: terlalu terang, kurangi backlight");
+      setQualityChip(qualityBrightness, "warn", "Cahaya: agak gelap");
+    } else if (avgLuma > 195) {
+      setQualityChip(qualityBrightness, "warn", "Cahaya: terlalu silau");
     } else {
-      setQualityChip(qualityBrightness, "good", "Cahaya: cukup untuk verifikasi");
+      setQualityChip(qualityBrightness, "good", "Cahaya: baik");
     }
 
     if (Math.abs(avgCenter - avgLuma) < 8) {
-      setQualityChip(qualityFraming, "good", "Framing: wajah diperkirakan sudah di tengah");
+      setQualityChip(qualityFraming, "good", "Posisi: wajah di tengah");
     } else {
-      setQualityChip(qualityFraming, "warn", "Framing: geser wajah ke tengah frame");
+      setQualityChip(qualityFraming, "warn", "Posisi: arahkan ke tengah");
     }
 
     if (brightnessDelta > 18) {
-      setQualityChip(qualityStability, "warn", "Stabilitas: kamera atau kepala terlalu banyak bergerak");
+      setQualityChip(qualityStability, "warn", "Stabilitas: tahan gerakan");
     } else {
-      setQualityChip(qualityStability, "good", "Stabilitas: posisi sudah cukup tenang");
+      setQualityChip(qualityStability, "good", "Stabilitas: tenang");
     }
   }
 
@@ -295,20 +398,21 @@
       return;
     }
     countdownOverlay.classList.remove("d-none");
+    const COUNTDOWN_STEP_MS = 850;
     for (let count = 3; count >= 1; count--) {
       countdownValue.textContent = String(count);
       countdownValue.classList.remove("tick");
       void countdownValue.offsetWidth;
       countdownValue.classList.add("tick");
-      speakGuide(String(count));
-      await sleep(250);
+      setCameraOverlayLabel("Bersiap dalam " + count + "… Posisikan wajah di tengah");
+      speakGuide(String(count), { queue: true, rate: 0.92, force: true });
+      await sleep(COUNTDOWN_STEP_MS);
     }
-    countdownValue.textContent = "GO";
+    countdownValue.textContent = "SIAP";
     countdownValue.classList.remove("tick");
     void countdownValue.offsetWidth;
     countdownValue.classList.add("tick");
-    speakGuide("Ambil verifikasi");
-    await sleep(150);
+    await sleep(600);
     countdownOverlay.classList.add("d-none");
   }
 
@@ -320,7 +424,7 @@
       }
 
       const GOOD_ENOUGH_ACCURACY_M = 60;
-      const WATCH_TIMEOUT_MS = 7000;
+      const WATCH_TIMEOUT_MS = 8000;
       let best = null;
       let watchId = null;
       let settled = false;
@@ -354,8 +458,6 @@
         return new Error("Gagal mendapatkan lokasi GPS.");
       }
 
-      // Watch (not single getCurrentPosition) so we can keep refining accuracy for a few
-      // seconds instead of settling for the first — often poor — fix, especially indoors.
       watchId = navigator.geolocation.watchPosition(
         function (pos) {
           if (!best || pos.coords.accuracy < best.coords.accuracy) best = pos;
@@ -401,21 +503,43 @@
 
   async function runLivenessChallenge() {
     const frames = [];
+    // Brief pause so user reads/hears the liveness prompt before frame comparison starts
+    setCameraOverlayLabel("Kedipkan mata atau anggukkan kepala sedikit…");
+    await sleep(650);
+
     for (let i = 0; i < LIVENESS_FRAMES; i++) {
+      if (i === 0) {
+        setLivenessUI(true, "Tahap 1/2: Lihat lurus ke kamera…");
+      } else if (i === 2) {
+        setLivenessUI(true, "Tahap 2/2: Kedipkan mata atau gerakkan kepala sedikit sekarang…");
+      }
       frames.push(captureSmallFrame());
       updateLivenessProgress((i + 1) / LIVENESS_FRAMES);
       if (i < LIVENESS_FRAMES - 1) await sleep(LIVENESS_INTERVAL_MS);
     }
 
     const ref = frames[0].data;
+    const w = 160;
+    const h = 120;
+    const cx = w / 2;
+    const cy = h / 2;
+    const rx = w * 0.34;
+    const ry = h * 0.40;
     let maxAvgDiff = 0;
     for (let fi = 1; fi < frames.length; fi++) {
       const cmp = frames[fi].data;
       let total = 0;
-      for (let p = 0; p < ref.length; p += 4) {
-        total += (Math.abs(ref[p] - cmp[p]) + Math.abs(ref[p + 1] - cmp[p + 1]) + Math.abs(ref[p + 2] - cmp[p + 2])) / 3;
+      let insidePixels = 0;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const normDist = Math.pow((x - cx) / rx, 2) + Math.pow((y - cy) / ry, 2);
+          if (normDist > 1.0) continue; // Ignore background outside the guide circle
+          const p = (y * w + x) * 4;
+          total += (Math.abs(ref[p] - cmp[p]) + Math.abs(ref[p + 1] - cmp[p + 1]) + Math.abs(ref[p + 2] - cmp[p + 2])) / 3;
+          insidePixels += 1;
+        }
       }
-      const avg = total / (ref.length / 4);
+      const avg = insidePixels > 0 ? total / insidePixels : 0;
       if (avg > maxAvgDiff) maxAvgDiff = avg;
     }
 
@@ -458,14 +582,13 @@
     if (!resultBox) {
       return;
     }
-    resultBox.className = `alert alert-${kind} small mb-0`;
+    resultBox.className = `alert alert-${kind} small mb-0 mt-2`;
     resultBox.textContent = text;
   }
 
   function setFaceButtonsDisabled(disabled) {
     [btnStart, btnRegister, btnCheckin, btnCheckout].forEach(function (btn) {
       if (btn) {
-        // Never force-enable checkin/checkout if the server already disabled them (face not registered yet).
         if (!disabled && btn !== btnRegister && btn !== btnStart && btn.dataset.serverDisabled === "true") {
           return;
         }
@@ -501,7 +624,7 @@
     }
     if (successDetail) {
       successDetail.textContent = data && data.message
-        ? data.message + (action === "register" ? " Silakan lanjut ke Langkah 2 untuk absensi." : " Silakan lanjutkan ke riwayat atau selesai.")
+        ? data.message + (action === "register" ? " Silakan lanjut ke tombol Check-in / Check-out." : " Silakan lanjutkan ke riwayat atau dashboard.")
         : "Data sudah terekam dengan aman.";
     }
     if (successAction) {
@@ -602,7 +725,7 @@
   async function startCamera() {
     if (!video) {
       notify("warning", "Panel Kamera", "Panel kamera tidak tersedia pada halaman ini.", 3200);
-      return;
+      return false;
     }
 
     try {
@@ -613,18 +736,19 @@
       video.srcObject = stream;
       if (cameraIdlePrompt) cameraIdlePrompt.classList.add("d-none");
       setGuideStage("camera", { speak: true });
-      setQualityChip(qualityBrightness, "wait", "Cahaya: membaca kondisi kamera");
-      setQualityChip(qualityFraming, "wait", "Framing: arahkan wajah ke tengah");
-      setQualityChip(qualityStability, "wait", "Stabilitas: tahan posisi sejenak");
+      setQualityChip(qualityBrightness, "wait", "Cahaya: membaca kamera");
+      setQualityChip(qualityFraming, "wait", "Posisi: arahkan ke tengah");
+      setQualityChip(qualityStability, "wait", "Stabilitas: tahan sejenak");
       startQualityLoop();
-      setMessage("info", "Kamera aktif. Arahkan wajah ke kamera dengan pencahayaan cukup.");
-      notify("info", "Kamera Aktif", "Arahkan wajah ke kamera dengan pencahayaan cukup.", 2500);
+      setMessage("info", "Kamera aktif. Posisikan wajah di dalam bingkai oval dengan pencahayaan cukup.");
+      return true;
     } catch (err) {
       if (cameraIdlePrompt) cameraIdlePrompt.classList.remove("d-none");
       const errText = err && err.message ? err.message : String(err);
-      setGuideStage("error", { text: errText });
-      setMessage("danger", `Gagal mengakses kamera: ${errText}`);
-      notify("danger", "Kamera Gagal", errText, 4200);
+      setGuideStage("error", { text: "Izinkan akses kamera pada browser HP Anda: " + errText });
+      setMessage("danger", `Gagal mengakses kamera: ${errText}. Pastikan izin kamera diizinkan di browser.`);
+      notify("danger", "Kamera Belum Diizinkan", errText, 4200);
+      return false;
     }
   }
 
@@ -636,24 +760,81 @@
     if (!video.srcObject) {
       throw new Error("Kamera belum aktif");
     }
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    const vw = video.videoWidth || 640;
+    const vh = video.videoHeight || 480;
+    canvas.width = vw;
+    canvas.height = vh;
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", 0.9);
+
+    // Mask out the area outside the central oval/circle guide so bystanders in the background
+    // are never sent or detected by the face recognition model.
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(0, 0, vw, vh);
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(vw / 2, vh / 2, vw * 0.36, vh * 0.42, 0, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(video, 0, 0, vw, vh);
+    ctx.restore();
+
+    return canvas.toDataURL("image/jpeg", 0.92);
+  }
+
+  async function captureRegistrationSamples(count) {
+    const frames = [];
+    setLivenessUI(true, "Memulai pengambilan 5 sampel wajah terarah…");
+    updateLivenessProgress(0);
+
+    for (let i = 0; i < count; i++) {
+      const poseText = REGISTER_POSE_PROMPTS[i] || `Sampel ${i + 1} dari ${count}: Tahan posisi wajah`;
+      setLivenessUI(true, poseText);
+      setCameraOverlayLabel(poseText);
+      setMessage("info", poseText + " — mohon tahan sebentar…");
+      if (i === 0 || i === 2 || i === 3) {
+        speakGuide(poseText, { force: true });
+      }
+      // Give the user a clear pause to adjust pose before capturing the frame
+      await sleep(REGISTER_SAMPLE_INTERVAL_MS);
+      try {
+        frames.push(captureFrame());
+      } catch (_) {
+        break;
+      }
+      updateLivenessProgress((i + 1) / count);
+    }
+    setLivenessUI(false);
+    return frames;
   }
 
   async function postFace(url, action, button, guideStage) {
-    setGuideStage(guideStage || (action === "checkout" ? "checkout" : action === "checkin" ? "checkin" : "register"), { speak: true });
-    setButtonBusy(button, true, "Memeriksa liveness…");
+    setButtonBusy(button, true, "Menyiapkan kamera…");
+
+    // 1. Auto-activate camera if not started yet, with warm-up pause so it never errors immediately
+    if (!stream || !video || !video.srcObject) {
+      setMessage("info", "Mengaktifkan kamera terlebih dahulu, mohon izinkan akses kamera…");
+      const cameraReady = await startCamera();
+      if (!cameraReady) {
+        setButtonBusy(button, false);
+        return false;
+      }
+      setMessage("info", "Kamera aktif. Posisikan wajah di tengah bingkai, proses dimulai dalam 2 detik…");
+      await sleep(1800);
+    }
+
+    // 2. Start GPS acquisition in parallel for check-in/check-out
     let locationPromise = null;
     if (url.indexOf("/face/verify") !== -1) {
-      setMessage("info", "Mengambil GPS sambil memeriksa liveness...");
       locationPromise = getCurrentLocation().then(
         function (value) { return { ok: true, value: value }; },
         function (error) { return { ok: false, error: error }; }
       );
     }
+
+    // 3. Announce stage and give a 1.3s reading/listening pause before countdown
+    setGuideStage(guideStage || (action === "checkout" ? "checkout" : action === "checkin" ? "checkin" : "register"), { speak: true });
+    setButtonBusy(button, true, "Bersiap hitung mundur…");
+    setMessage("info", "Posisikan wajah di dalam bingkai oval. Hitung mundur dimulai sebentar lagi…");
+    await sleep(1300);
 
     try {
       await runCaptureCountdown();
@@ -661,33 +842,47 @@
       // Ignore countdown issues and continue to verification.
     }
 
-    // Client-side liveness gate: static photo → near-zero inter-frame motion
+    // 4. Human-paced liveness challenge
     try {
+      setButtonBusy(button, true, "Uji gerakan wajah…");
       setGuideStage("liveness", { speak: true });
       setLivenessUI(true, "Kedipkan mata atau gerakkan kepala sedikit…");
-      setMessage("info", "Liveness check — kedipkan mata atau gerakkan kepala sedikit…");
+      setMessage("info", "Uji keaslian wajah — kedipkan mata atau gerakkan kepala sedikit selama 2 detik…");
       updateLivenessProgress(0);
 
       const liveness = await runLivenessChallenge();
       setLivenessUI(false);
 
       if (!liveness.passed) {
-        setGuideStage("error", { text: "Gerakan wajah terlalu minim. Ulangi sambil berkedip atau miringkan kepala sedikit." });
-        setMessage("danger", "Terdeteksi gambar statis (score: " + liveness.score + "). Pastikan wajah nyata di depan kamera, bukan foto.");
-        notify("danger", "Liveness Gagal", "Terdeteksi gambar statis. Kedipkan mata atau gerakkan wajah.", 5000);
+        setGuideStage("error", { text: "Gerakan wajah belum terbaca. Coba lagi sambil berkedip atau mengangguk sedikit saat diminta." });
+        setMessage("danger", "Gerakan wajah belum terdeteksi (skor gerak: " + liveness.score + "). Pastikan wajah asli bergerak sedikit di depan kamera, lalu ulangi.");
+        notify("warning", "Ulangi Gerakan Wajah", "Kedipkan mata atau gerakkan kepala sedikit saat bar liveness berjalan.", 5000);
         setButtonBusy(button, false);
         return false;
       }
     } catch (_) {
       setLivenessUI(false);
-      // Lanjutkan jika error capture (misal kamera baru aktif)
     }
 
-    setButtonBusy(button, true, "Memverifikasi…");
+    // 5. Capture frame(s) and send to server
+    setButtonBusy(button, true, action === "register" ? "Mengambil 5 sampel wajah…" : "Memverifikasi…");
+    setGuideStage("processing");
     try {
-      const imageBase64 = captureFrame();
-      const payload = { image_base64: imageBase64, action };
+      let payload;
+      if (action === "register") {
+        const frames = await captureRegistrationSamples(REGISTER_SAMPLES);
+        if (frames.length === 0) {
+          throw new Error("Gagal mengambil sampel wajah dari kamera");
+        }
+        payload = { image_base64: frames[0], images_base64: frames, action };
+        setMessage("info", `Mengirim ${frames.length} sampel wajah ke server untuk disimpan...`);
+      } else {
+        setCameraOverlayLabel("Tahan posisi, mengambil foto verifikasi…");
+        await sleep(350);
+        payload = { image_base64: captureFrame(), action };
+      }
       if (url.indexOf("/face/verify") !== -1) {
+        setMessage("info", "Memastikan titik koordinat GPS kantor...");
         const locationResult = await locationPromise;
         if (!locationResult.ok) throw locationResult.error;
         const geo = locationResult.value;
@@ -697,14 +892,17 @@
       }
       const response = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": window.getCsrfToken ? window.getCsrfToken() : ""
+        },
         body: JSON.stringify(payload)
       });
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.detail || "Proses gagal");
       }
-      const confidenceText = data.confidence ? ` | confidence: ${data.confidence}` : "";
+      const confidenceText = data.confidence ? ` | skor kemiripan: ${data.confidence}` : "";
       const distanceText = typeof data.distance_m === "number"
         ? ` | jarak kantor: ${Math.round(data.distance_m)}m`
         : "";
@@ -716,7 +914,7 @@
         ? ` | ${data.location_risk_message}`
         : "";
       const successText = action === "register"
-        ? "Foto wajah tersimpan. Lanjut ke Langkah 2 untuk melakukan Check-in / Check-out."
+        ? "5 sampel wajah tersimpan. Silakan lanjut menekan tombol Check-in atau Check-out."
         : GUIDE_STAGES.success.text;
       const notifyTitle = action === "register" ? "Registrasi Berhasil" : "Verifikasi Berhasil";
       setGuideStage("success", { title: data.message || GUIDE_STAGES.success.title, text: successText, speak: true });
@@ -729,9 +927,11 @@
       notify("success", notifyTitle, `${data.message}${confidenceText}${distanceText}${reviewText}${sourceText}${riskText}`, 3800);
       return true;
     } catch (err) {
-      setGuideStage("error", { text: err.message });
-      setMessage("danger", err.message);
-      notify("danger", "Verifikasi Gagal", err.message, 4500);
+      const message = (err && err.message) ? err.message : "Proses gagal";
+      const failedStage = stageForError(message);
+      setGuideStage(failedStage, { text: message });
+      setMessage("danger", message);
+      notify("danger", "Verifikasi Gagal", message, 4500);
       return false;
     } finally {
       setButtonBusy(button, false);
@@ -750,7 +950,10 @@
       };
       const response = await fetch("/api/attendance/manual", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": window.getCsrfToken ? window.getCsrfToken() : ""
+        },
         body: JSON.stringify(payload)
       });
       const data = await response.json();
@@ -801,8 +1004,6 @@
   if (btnRegister) {
     btnRegister.addEventListener("click", () =>
       postFace("/api/face/register", "register", btnRegister, "register").then(function (success) {
-        // Navigate with a flag so the reloaded page shows a persistent confirmation banner
-        // and unlocks check-in/out (instead of feeling like a blank reload).
         if (success) {
           setTimeout(() => {
             window.location.assign(window.location.pathname + "?registered=1");

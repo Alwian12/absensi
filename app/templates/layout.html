@@ -7,9 +7,8 @@
     <meta name="theme-color" content="#6366f1">
     <link rel="manifest" href="/static/manifest.json">
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preload" href="/static/vendor/fonts/plus-jakarta-sans-400.woff2" as="font" type="font/woff2" crossorigin>
+    <link href="/static/vendor/fonts.css" rel="stylesheet">
     <link href="/static/vendor/bootstrap.min.css" rel="stylesheet">
     <link href="{{ url_for('static', path='styles.css') }}?v=20260904" rel="stylesheet">
     <script src="/static/vendor/lucide.min.js" defer></script>
@@ -89,18 +88,12 @@
           <a class="nav-link {% if request.url.path == '/admin-audit' %}active-route{% endif %}" href="/admin-audit">
             <i data-lucide="shield-check" class="nav-icon"></i><span class="nav-label">Audit Log</span>
           </a>
-          <a class="nav-link {% if request.url.path == '/activity-log' %}active-route{% endif %}" href="/activity-log">
-            <i data-lucide="activity" class="nav-icon"></i><span class="nav-label">Log Aktivitas</span>
-          </a>
           <p class="nav-section-label">Laporan</p>
           <a class="nav-link" href="/api/reports/attendance/excel">
             <i data-lucide="file-spreadsheet" class="nav-icon"></i><span class="nav-label">Laporan Excel</span>
           </a>
           <a class="nav-link" href="/api/reports/attendance/pdf">
             <i data-lucide="file-text" class="nav-icon"></i><span class="nav-label">Laporan PDF</span>
-          </a>
-          <a class="nav-link" href="/api/reports/rekap/csv">
-            <i data-lucide="table-2" class="nav-icon"></i><span class="nav-label">Rekap Resmi CSV</span>
           </a>
           <a class="nav-link" href="/admin/backup">
             <i data-lucide="database-backup" class="nav-icon"></i><span class="nav-label">Backup DB</span>
@@ -155,7 +148,7 @@
         </nav>
       </aside>
 
-      <main class="app-main">
+      <main class="app-main" data-page="{{ request.url.path }}">
         <header class="d-flex justify-content-between align-items-center app-header">
           <h2 class="h5 mb-0">{% block page_title %}Dashboard{% endblock %}</h2>
           <div class="d-flex align-items-center gap-2">
@@ -181,9 +174,11 @@
             <div class="header-avatar" id="headerAvatar" title="{{ current_user.username if current_user else 'Guest' }}">
               {{ (current_user.username[0] | upper) if current_user else 'G' }}
             </div>
-            <a href="/logout" class="btn btn-ghost-icon btn-sm text-danger" title="Keluar" aria-label="Keluar">
-              <i data-lucide="log-out" width="16" height="16"></i>
-            </a>
+            <form method="post" action="/logout" class="d-inline">
+              <button type="submit" class="btn btn-ghost-icon btn-sm text-danger" title="Keluar" aria-label="Keluar">
+                <i data-lucide="log-out" width="16" height="16"></i>
+              </button>
+            </form>
           </div>
         </header>
 
@@ -198,7 +193,7 @@
       document.addEventListener("DOMContentLoaded", function () {
         if (window.lucide) lucide.createIcons();
         // Auto-inject CSRF token into every form POST
-        var csrfToken = document.cookie.split("; ").find(function(r){ return r.startsWith("csrf_token="); });
+        var csrfToken = document.cookie.split("; ").find(function(r){ return r.startsWith("csrf_token_v2="); });
         if (csrfToken) {
           csrfToken = csrfToken.split("=")[1];
           document.querySelectorAll("form[method='post'],form[method='POST']").forEach(function(f) {

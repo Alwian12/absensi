@@ -3,19 +3,11 @@ from sqlalchemy.orm import Session
 from fastapi import Depends
 
 from app.authentication.jwt_handler import create_token, hash_password, verify_password
-from app.database import SessionLocal
+from app.database import get_db
 from app.models.user import User
 from app.schemas.auth import LoginRequest, LoginResponse, RegisterRequest
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-
-def get_db() -> Session:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 @router.post("/login", response_model=LoginResponse)

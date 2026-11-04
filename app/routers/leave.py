@@ -1,4 +1,4 @@
-"""Routes for leave requests and activity log."""
+"""Routes for leave requests."""
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, Form, Request, status
@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models.attendance import Attendance
-from app.models.activity_log import ActivityLog
 from app.models.leave_request import LeaveRequest
 from app.models.notification import Notification
 from app.models.user import User
@@ -29,20 +28,44 @@ def get_db() -> Session:
 
 
 @router.get("/leave")
-def leave_page(request: Request, db: Session = Depends(get_db)) -> object:
+def leave_page(request: Request, scope: str = "bidang", db: Session = Depends(get_db)) -> object:
     current_user = get_current_user(request, db)
     if not current_user:
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
 
+    from app.models.participant import Participant
+    from app.routers.web import resolve_supervisor_bidang_scope
+
     can_manage = current_user.role in {"admin", "pembimbing"}
+    bidang_scope = resolve_supervisor_bidang_scope(db, current_user, scope)
     if can_manage:
-        leaves = db.query(LeaveRequest).order_by(LeaveRequest.id.desc()).limit(200).all()
+        lq = db.query(LeaveRequest)
+        if bidang_scope["allowed_user_ids"] is not None:
+            allowed_ids = bidang_scope["allowed_user_ids"]
+            lq = lq.filter(LeaveRequest.user_id.in_(allowed_ids)) if allowed_ids else lq.filter(LeaveRequest.id == -1)
+        leaves = lq.order_by(LeaveRequest.id.desc()).limit(200).all()
     else:
         leaves = db.query(LeaveRequest).filter(
             LeaveRequest.user_id == current_user.id
         ).order_by(LeaveRequest.id.desc()).all()
 
-    return render_with_user(request, "leave.html", {"leaves": leaves, "can_manage": can_manage}, current_user)
+    user_ids = {l.user_id for l in leaves if l.user_id}
+    participant_map = {
+        p.user_id: p
+        for p in (db.query(Participant).filter(Participant.user_id.in_(user_ids)).all() if user_ids else [])
+    }
+
+    return render_with_user(
+        request,
+        "leave.html",
+        {
+            "leaves": leaves,
+            "can_manage": can_manage,
+            "bidang_scope": bidang_scope,
+            "participant_map": participant_map,
+        },
+        current_user,
+    )
 
 
 @router.post("/leave")
@@ -103,43 +126,32 @@ def review_leave(
     leave.reviewed_at = datetime.now()
     leave.catatan_reviewer = catatan.strip()
 
+    day_start = datetime.combine(leave.tanggal.date(), datetime.min.time())
+    day_end = day_start.replace(hour=23, minute=59, second=59)
+    attendance = (
+        db.query(Attendance)
+        .filter(Attendance.user_id == leave.user_id)
+        .filter(Attendance.attendance_date >= day_start, Attendance.attendance_date <= day_end)
+        .order_by(Attendance.id.desc())
+        .first()
+    )
+
     if action == "approved":
-        day_start = datetime.combine(leave.tanggal.date(), datetime.min.time())
-        day_end = day_start.replace(hour=23, minute=59, second=59)
-        attendance = (
-            db.query(Attendance)
-            .filter(Attendance.user_id == leave.user_id)
-            .filter(Attendance.attendance_date >= day_start, Attendance.attendance_date <= day_end)
-            .order_by(Attendance.id.desc())
-            .first()
-        )
+        target_status = leave.jenis if leave.jenis in {"izin", "sakit"} else "izin"
         if attendance and attendance.check_in_time is None:
-            attendance.status = leave.jenis if leave.jenis in {"izin", "sakit"} else "izin"
+            attendance.status = target_status
         elif not attendance:
             db.add(Attendance(
                 user_id=leave.user_id,
                 attendance_date=day_start,
-                status=leave.jenis if leave.jenis in {"izin", "sakit"} else "izin",
+                status=target_status,
             ))
+    elif action == "rejected":
+        if attendance and attendance.check_in_time is None and attendance.status in {"izin", "sakit"}:
+            db.delete(attendance)
 
     label = "disetujui" if action == "approved" else "ditolak"
     push_notification(db, leave.user_id, f"Permohonan izin Anda {label} oleh {current_user.username}.", "success" if action == "approved" else "warning")
     log_activity(db, current_user.id, f"review_leave_{action}", f"Leave #{leave_id} milik user {leave.user_id}")
     db.commit()
     return RedirectResponse(f"/leave?success=Permohonan izin berhasil {label}.", status_code=status.HTTP_303_SEE_OTHER)
-
-
-@router.get("/activity-log")
-def activity_log_page(request: Request, db: Session = Depends(get_db)) -> object:
-    current_user = get_current_user(request, db)
-    if not current_user:
-        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
-
-    if current_user.role in {"admin", "pembimbing"}:
-        logs = db.query(ActivityLog).order_by(ActivityLog.id.desc()).limit(300).all()
-    else:
-        logs = db.query(ActivityLog).filter(
-            ActivityLog.user_id == current_user.id
-        ).order_by(ActivityLog.id.desc()).limit(100).all()
-
-    return render_with_user(request, "activity_log.html", {"logs": logs}, current_user)

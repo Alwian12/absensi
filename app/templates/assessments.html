@@ -4,6 +4,21 @@
 {% block page_title %}{{ assessments_page_title }}{% endblock %}
 
 {% block content %}
+{% if bidang_scope and bidang_scope.is_supervisor and bidang_scope.supervisor_bidang %}
+<div class="alert alert-info d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <strong>Filter Bidang Pembimbing: {{ bidang_scope.supervisor_bidang }}</strong>
+    <span class="small d-block text-muted">
+      {% if bidang_scope.scope == 'bidang' %}Menampilkan penilaian peserta bidang <strong>{{ bidang_scope.supervisor_bidang }}</strong>.{% else %}Menampilkan seluruh peserta lintas bidang.{% endif %}
+    </span>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/assessments?scope=bidang" class="btn btn-sm {% if bidang_scope.scope == 'bidang' %}btn-primary{% else %}btn-outline-primary{% endif %}">Bidang Saya</a>
+    <a href="/assessments?scope=all" class="btn btn-sm {% if bidang_scope.scope == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">Semua Bidang</a>
+  </div>
+</div>
+{% endif %}
+
 {% set score = namespace(high=0, mid=0, low=0, total=0) %}
 {% for assessment in assessments %}
   {% set nilai = assessment.nilai or 0 %}
@@ -30,31 +45,32 @@
         </svg>
       </span>
       <div>
-      <h5 class="mb-0">{{ assessments_page_title }}</h5>
+        <h5 class="mb-0">{{ assessments_page_title }}</h5>
+        <p class="text-muted small mb-0">Evaluasi objektif berdasarkan disiplin kehadiran, kualitas jurnal harian, dan etika kerja peserta PKL.</p>
       </div>
     </div>
     <span class="summary-badge">{{ assessments|length }} penilaian</span>
   </div>
   <div class="row g-2 mt-2 mini-metric-row">
-    <div class="col-sm-4">
+    <div class="col-6 col-sm-3">
       <div class="mini-metric mini-metric-high">
-        <span class="mini-metric-label">Skor Tinggi</span>
+        <span class="mini-metric-label">Sangat Baik (&ge;85)</span>
         <strong class="mini-metric-value">{{ score.high }}</strong>
       </div>
     </div>
-    <div class="col-sm-4">
+    <div class="col-6 col-sm-3">
       <div class="mini-metric mini-metric-mid">
-        <span class="mini-metric-label">Skor Menengah</span>
+        <span class="mini-metric-label">Baik (70–84)</span>
         <strong class="mini-metric-value">{{ score.mid }}</strong>
       </div>
     </div>
-    <div class="col-sm-4">
+    <div class="col-6 col-sm-3">
       <div class="mini-metric mini-metric-low">
-        <span class="mini-metric-label">Skor Rendah</span>
+        <span class="mini-metric-label">Perlu Pembinaan (&lt;70)</span>
         <strong class="mini-metric-value">{{ score.low }}</strong>
       </div>
     </div>
-    <div class="col-sm-12">
+    <div class="col-6 col-sm-3">
       <div class="mini-metric mini-metric-neutral">
         <span class="mini-metric-label">Rata-rata Nilai</span>
         <strong class="mini-metric-value">{{ '%.1f'|format(avg) }}</strong>
@@ -65,59 +81,158 @@
 
 {% if can_manage_assessment %}
 <section class="panel-card mb-3 panel-elevated">
-  <h5>Tambah Nilai Baru</h5>
-  <p class="text-muted mb-2">Gunakan skala 0-100 dan tambahkan catatan singkat agar feedback lebih jelas untuk peserta.</p>
-  <form method="post" class="row g-2 mt-1">
-    <div class="col-lg-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+    <div>
+      <h5 class="mb-0">Input Evaluasi &amp; Nilai Peserta PKL</h5>
+      <small class="text-muted">Gunakan kalkulator bantu 3 aspek di bawah (opsional) atau ketik langsung nilai akhir skala 0–100.</small>
+    </div>
+  </div>
+
+  <div class="p-2 px-3 rounded border bg-body-tertiary mb-3">
+    <div class="small fw-semibold mb-2 text-primary">Kalkulator Bantu Hitung Nilai Multi-Aspek (Otomatis Mengisi Nilai Akhir &amp; Catatan)</div>
+    <div class="row g-2 align-items-end">
+      <div class="col-sm-4">
+        <label class="form-label small mb-1">1. Disiplin &amp; Kehadiran (0–100)</label>
+        <input type="number" min="0" max="100" class="form-control form-control-sm calc-aspect" id="aspectDisiplin" placeholder="Contoh: 90">
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label small mb-1">2. Kualitas Jurnal &amp; Tugas (0–100)</label>
+        <input type="number" min="0" max="100" class="form-control form-control-sm calc-aspect" id="aspectTugas" placeholder="Contoh: 85">
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label small mb-1">3. Etika &amp; Kerja Sama (0–100)</label>
+        <input type="number" min="0" max="100" class="form-control form-control-sm calc-aspect" id="aspectEtika" placeholder="Contoh: 88">
+      </div>
+    </div>
+  </div>
+
+  <form method="post" action="/assessments" class="row g-2">
+    <div class="col-lg-4">
+      <label class="form-label small text-muted mb-1">Pilih Peserta PKL</label>
       <select class="form-select" name="user_id" required>
         {% for participant in participants %}
-        <option value="{{ participant.user_id }}">{{ participant.nama_lengkap }}</option>
+        <option value="{{ participant.user_id }}">
+          {{ participant.nama_lengkap }}{% if participant.bidang %} ({{ participant.bidang }}){% endif %}
+        </option>
         {% else %}
-        <option value="">Belum ada peserta</option>
+        <option value="">Belum ada peserta di bidang ini</option>
         {% endfor %}
       </select>
     </div>
-    <div class="col-lg-2"><input class="form-control" name="nilai" type="number" min="0" max="100" placeholder="Nilai" required></div>
-    <div class="col-lg-5"><input class="form-control" name="catatan" placeholder="Catatan"></div>
-    <div class="col-lg-2"><button class="btn btn-primary w-100">Simpan</button></div>
+    <div class="col-lg-2">
+      <label class="form-label small text-muted mb-1">Nilai Akhir (0–100)</label>
+      <input class="form-control fw-bold" id="nilaiAkhirInput" name="nilai" type="number" min="0" max="100" placeholder="0-100" required>
+    </div>
+    <div class="col-lg-4">
+      <label class="form-label small text-muted mb-1">Catatan Evaluasi Pembimbing</label>
+      <input class="form-control" id="catatanEvaluasiInput" name="catatan" placeholder="Catatan evaluasi & rincian komponen nilai">
+    </div>
+    <div class="col-lg-2 d-flex align-items-end">
+      <button class="btn btn-primary w-100" {% if not participants %}disabled{% endif %}>Simpan Nilai</button>
+    </div>
   </form>
 </section>
 {% endif %}
 
 <section class="panel-card panel-elevated">
-  <h5>Riwayat Penilaian</h5>
-  <p class="text-muted mb-2">Data terbaru ditampilkan di bagian atas tabel.</p>
+  <h5>Riwayat Penilaian PKL</h5>
   <div class="table-responsive mt-2">
     <table class="table table-hover align-middle assessment-table">
       <thead>
         <tr>
           <th>#</th>
-          {% if can_manage_assessment %}<th>User</th>{% endif %}
-          <th>Nilai</th>
-          <th>Catatan</th>
+          {% if can_manage_assessment %}<th>Peserta &amp; Bidang</th>{% endif %}
+          <th>Nilai &amp; Predikat</th>
+          <th>Catatan Evaluasi</th>
+          {% if can_manage_assessment %}<th>Kontrol</th>{% endif %}
         </tr>
       </thead>
       <tbody>
         {% for assessment in assessments %}
         {% set nilai = assessment.nilai or 0 %}
+        {% set p_info = (participant_map or {}).get(assessment.user_id) %}
         <tr>
           <td>{{ assessment.id }}</td>
-          {% if can_manage_assessment %}<td>{{ assessment.user.username if assessment.user else ('User ' ~ assessment.user_id) }}</td>{% endif %}
+          {% if can_manage_assessment %}
           <td>
-            <span class="score-pill {% if nilai >= 85 %}score-high{% elif nilai >= 70 %}score-mid{% else %}score-low{% endif %}">
-              {{ assessment.nilai }}
-            </span>
-            <span class="badge border ms-1 status-pill-neutral">
-              {% if nilai >= 85 %}Grade A{% elif nilai >= 70 %}Grade B{% else %}Grade C{% endif %}
+            <div class="fw-semibold">{{ p_info.nama_lengkap if p_info else (assessment.user.username if assessment.user else ('User ' ~ assessment.user_id)) }}</div>
+            <small class="text-muted">
+              @{{ assessment.user.username if assessment.user else assessment.user_id }}
+              {% if p_info and p_info.bidang %}• <span class="badge text-bg-info">{{ p_info.bidang }}</span>{% endif %}
+            </small>
+          </td>
+          {% endif %}
+          <td>
+            <span class="badge text-bg-light border assessment-score-pill {% if nilai >= 85 %}status-pill-high{% elif nilai >= 70 %}status-pill-mid{% else %}status-pill-low{% endif %}">
+              {{ nilai }} — {% if nilai >= 85 %}Sangat Baik (A){% elif nilai >= 70 %}Baik (B){% elif nilai >= 55 %}Cukup (C){% else %}Kurang (D){% endif %}
             </span>
           </td>
           <td>{{ assessment.catatan or '-' }}</td>
+          {% if can_manage_assessment %}
+          <td style="min-width:210px">
+            <div class="d-flex flex-wrap gap-1">
+              <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#editAss{{ assessment.id }}">
+                Edit Nilai
+              </button>
+              <form method="post" action="/assessments/{{ assessment.id }}/delete" onsubmit="return confirm('Hapus penilaian ini?')">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Hapus</button>
+              </form>
+            </div>
+            <div class="collapse mt-2" id="editAss{{ assessment.id }}">
+              <form method="post" action="/assessments/{{ assessment.id }}/edit" class="p-2 border rounded bg-body-tertiary d-flex flex-column gap-2">
+                <div>
+                  <label class="form-label small mb-0">Nilai Baru (0–100)</label>
+                  <input class="form-control form-control-sm" type="number" name="nilai" min="0" max="100" value="{{ nilai }}" required>
+                </div>
+                <div>
+                  <label class="form-label small mb-0">Catatan Evaluasi</label>
+                  <input class="form-control form-control-sm" name="catatan" value="{{ assessment.catatan or '' }}">
+                </div>
+                <button class="btn btn-sm btn-primary align-self-end" type="submit">Simpan Perubahan</button>
+              </form>
+            </div>
+          </td>
+          {% endif %}
         </tr>
         {% else %}
-        <tr><td colspan="{{ 4 if can_manage_assessment else 3 }}" class="text-center text-muted">Belum ada data penilaian.</td></tr>
+        <tr><td colspan="{{ 5 if can_manage_assessment else 3 }}" class="text-center text-muted py-3">Belum ada data penilaian.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var dEl = document.getElementById("aspectDisiplin");
+    var tEl = document.getElementById("aspectTugas");
+    var eEl = document.getElementById("aspectEtika");
+    var finalEl = document.getElementById("nilaiAkhirInput");
+    var noteEl = document.getElementById("catatanEvaluasiInput");
+    if (!dEl || !tEl || !eEl || !finalEl || !noteEl) return;
+
+    function recalc() {
+      var vals = [];
+      var parts = [];
+      var d = parseFloat(dEl.value);
+      var t = parseFloat(tEl.value);
+      var e = parseFloat(eEl.value);
+      if (!isNaN(d)) { vals.push(d); parts.push("Disiplin: " + Math.round(d)); }
+      if (!isNaN(t)) { vals.push(t); parts.push("Jurnal/Tugas: " + Math.round(t)); }
+      if (!isNaN(e)) { vals.push(e); parts.push("Etika: " + Math.round(e)); }
+      if (vals.length > 0) {
+        var sum = vals.reduce(function(a, b) { return a + b; }, 0);
+        var avg = Math.round(sum / vals.length);
+        finalEl.value = Math.max(0, Math.min(100, avg));
+        noteEl.value = "Rincian (" + parts.join(", ") + ")";
+      }
+    }
+
+    dEl.addEventListener("input", recalc);
+    tEl.addEventListener("input", recalc);
+    eEl.addEventListener("input", recalc);
+  })();
+</script>
 {% endblock %}

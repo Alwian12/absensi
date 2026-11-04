@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta, time, date
+from typing import Iterator
 import csv
 from io import StringIO
 
@@ -8,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.authentication.jwt_handler import hash_password
-from app.database import SessionLocal
+from app.database import get_db
 from app.models.admin_audit_log import AdminAuditLog
 from app.models.announcement import Announcement
 from app.models.assessment import Assessment
@@ -30,14 +31,6 @@ from app.services.password_policy import validate_password
 
 router = APIRouter(tags=["admin"])
 templates = Jinja2Templates(directory="app/templates")
-
-
-def get_db() -> Session:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 def parse_date_input(raw_value: str | None) -> datetime | None:
@@ -96,15 +89,31 @@ def supervisors_page(request: Request, db: Session = Depends(get_db)) -> object:
     if current_user.role != "admin":
         return RedirectResponse("/dashboard", status_code=status.HTTP_303_SEE_OTHER)
 
-    supervisors = db.query(Supervisor).all()
-    all_pembimbing_users = db.query(User).filter(User.role == "pembimbing", User.is_active == True).all()
+    from app.routers.web import get_bidang_options
+    supervisors = db.query(Supervisor).order_by(Supervisor.id.desc()).all()
+    all_pembimbing_users = db.query(User).filter(User.role == "pembimbing").all()
     linked_user_ids = {s.user_id for s in supervisors}
-    users_without_profile = [u for u in all_pembimbing_users if u.id not in linked_user_ids]
-    users = [u for u in all_pembimbing_users if u.id not in linked_user_ids]
+    users_without_profile = [u for u in all_pembimbing_users if u.id not in linked_user_ids and u.is_active]
+    users = users_without_profile
+    bidang_options = get_bidang_options(db)
+
+    all_participants = db.query(Participant).all()
+    participant_counts_by_bidang: dict[str, int] = {}
+    for p in all_participants:
+        key = (p.bidang or "").strip().lower()
+        if key:
+            participant_counts_by_bidang[key] = participant_counts_by_bidang.get(key, 0) + 1
+
     return render_with_user(
         request,
         "supervisors.html",
-        {"supervisors": supervisors, "users": users, "users_without_profile": users_without_profile},
+        {
+            "supervisors": supervisors,
+            "users": users,
+            "users_without_profile": users_without_profile,
+            "bidang_options": bidang_options,
+            "participant_counts_by_bidang": participant_counts_by_bidang,
+        },
         current_user,
     )
 
@@ -306,10 +315,11 @@ def edit_participant(
     nama_lengkap: str = Form(...),
     jurusan: str = Form(""),
     instansi: str = Form(""),
+    bidang: str = Form(""),
     db: Session = Depends(get_db),
 ) -> object:
     current_user = get_current_user(request, db)
-    if not current_user or current_user.role != "admin":
+    if not current_user or current_user.role not in {"admin", "pembimbing"}:
         return RedirectResponse("/dashboard", status_code=status.HTTP_303_SEE_OTHER)
 
     participant = db.query(Participant).filter(Participant.id == participant_id).first()
@@ -319,6 +329,7 @@ def edit_participant(
     participant.nama_lengkap = nama_lengkap.strip()
     participant.jurusan = jurusan.strip() or None
     participant.instansi = instansi.strip() or None
+    participant.bidang = bidang.strip() or None
     log_activity(db, current_user.id, "edit_participant", f"Edit profil peserta {participant.nama_lengkap}")
     db.commit()
     return RedirectResponse("/participants?success=Profil peserta berhasil diperbarui.", status_code=status.HTTP_303_SEE_OTHER)
@@ -331,6 +342,7 @@ def complete_participant_profile(
     nama_lengkap: str = Form(...),
     jurusan: str = Form(""),
     instansi: str = Form(""),
+    bidang: str = Form(""),
     tanggal_mulai: str = Form(...),
     tanggal_selesai: str = Form(...),
     db: Session = Depends(get_db),
@@ -361,6 +373,7 @@ def complete_participant_profile(
         nama_lengkap=nama_lengkap.strip(),
         jurusan=jurusan.strip() or None,
         instansi=instansi.strip() or None,
+        bidang=bidang.strip() or None,
         tanggal_mulai=mulai,
         tanggal_selesai=selesai,
     )
@@ -378,6 +391,8 @@ def edit_supervisor(
     nip: str = Form(""),
     jabatan: str = Form(""),
     bidang: str = Form(""),
+    username: str = Form(""),
+    email: str = Form(""),
     db: Session = Depends(get_db),
 ) -> object:
     current_user = get_current_user(request, db)
@@ -388,19 +403,74 @@ def edit_supervisor(
     if not sv:
         return RedirectResponse("/supervisors?error=Pembimbing tidak ditemukan.", status_code=status.HTTP_303_SEE_OTHER)
 
+    if not nama_lengkap.strip():
+        return RedirectResponse("/supervisors?error=Nama lengkap pembimbing wajib diisi.", status_code=status.HTTP_303_SEE_OTHER)
+
+    if sv.user and (username.strip() or email.strip()):
+        clean_username = username.strip() or sv.user.username
+        clean_email = (email.strip() or sv.user.email).lower()
+        conflict = (
+            db.query(User)
+            .filter(((User.username == clean_username) | (User.email == clean_email)) & (User.id != sv.user.id))
+            .first()
+        )
+        if conflict:
+            return RedirectResponse("/supervisors?error=Username atau email sudah dipakai akun lain.", status_code=status.HTTP_303_SEE_OTHER)
+        sv.user.username = clean_username
+        sv.user.email = clean_email
+
     sv.nama_lengkap = nama_lengkap.strip()
     sv.nip = nip.strip() or None
     sv.jabatan = jabatan.strip() or None
     sv.bidang = bidang.strip() or None
+    log_admin_action(
+        db,
+        current_user.id,
+        "edit_supervisor",
+        sv.user_id,
+        f"Edit data pembimbing {sv.nama_lengkap} (bidang={sv.bidang or '-'})",
+        request.client.host if request.client else None,
+    )
     db.commit()
     return RedirectResponse("/supervisors?success=Data pembimbing berhasil diperbarui.", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/users/{user_id}/activate")
+def activate_user(
+    user_id: int,
+    request: Request,
+    redirect_to: str = Form("/supervisors"),
+    db: Session = Depends(get_db),
+) -> object:
+    current_user = get_current_user(request, db)
+    if not current_user or current_user.role != "admin":
+        return RedirectResponse("/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+
+    clean_redirect = redirect_to if redirect_to in {"/participants", "/supervisors", "/dashboard"} else "/supervisors"
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        return RedirectResponse(f"{clean_redirect}?error=Pengguna tidak ditemukan.", status_code=status.HTTP_303_SEE_OTHER)
+
+    target.is_active = True
+    target.deleted_at = None
+    log_admin_action(
+        db,
+        current_user.id,
+        "activate_user",
+        user_id,
+        f"Aktifkan kembali akun {target.username}",
+        request.client.host if request.client else None,
+    )
+    db.commit()
+    return RedirectResponse(f"{clean_redirect}?success=Akun {target.username} berhasil diaktifkan kembali.", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/journal/{journal_id}/comment")
 def post_journal_comment(
     journal_id: int,
     request: Request,
-    komentar: str = Form(...),
+    komentar: str = Form(""),
+    status_review: str = Form(""),
     db: Session = Depends(get_db),
 ) -> object:
     current_user = get_current_user(request, db)
@@ -414,8 +484,29 @@ def post_journal_comment(
         return RedirectResponse("/journal?error=Jurnal tidak ditemukan.", status_code=status.HTTP_303_SEE_OTHER)
 
     j.komentar = komentar.strip()[:500]
+    clean_status = status_review.strip().lower()
+    if clean_status in {"revisi", "approved", "pending", "rejected"}:
+        j.status = clean_status
+        from app.services.notifications import push_notification
+        if clean_status == "revisi":
+            push_notification(
+                db,
+                j.user_id,
+                f"Jurnal #{j.id} perlu direvisi: {j.komentar or 'Periksa catatan pembimbing.'}",
+                "warning",
+            )
+        elif clean_status == "approved":
+            push_notification(
+                db,
+                j.user_id,
+                f"Jurnal #{j.id} telah direview pembimbing: {j.komentar or 'Disetujui.'}",
+                "success",
+            )
+    elif j.komentar:
+        from app.services.notifications import push_notification
+        push_notification(db, j.user_id, f"Catatan pembimbing pada jurnal #{j.id}: {j.komentar[:120]}", "info")
     db.commit()
-    return RedirectResponse("/journal?success=Komentar berhasil disimpan.", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse("/journal?success=Catatan review jurnal berhasil disimpan.", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/announcements")
@@ -562,44 +653,201 @@ def permanently_delete_user(
     return RedirectResponse(f"{redirect_to}?success=Akun {target_name} berhasil dihapus permanen.", status_code=status.HTTP_303_SEE_OTHER)
 
 
+def find_mysqldump() -> str | None:
+    """Locate mysqldump binary in PATH, Laragon installation, or standard paths."""
+    import glob, os, shutil
+
+    bin_path = shutil.which("mysqldump")
+    if bin_path and os.path.isfile(bin_path):
+        return bin_path
+
+    # Laragon MySQL bins (e.g. C:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysqldump.exe)
+    laragon_matches = sorted(glob.glob(r"C:\laragon\bin\mysql\*\bin\mysqldump.exe"))
+    if laragon_matches:
+        return laragon_matches[-1]
+
+    # Standard Program Files installation
+    program_files_matches = sorted(glob.glob(r"C:\Program Files\MySQL\MySQL Server *\bin\mysqldump.exe"))
+    if program_files_matches:
+        return program_files_matches[-1]
+
+    return None
+
+
+def generate_mysql_dump_python(db: Session, database_name: str) -> Iterator[bytes]:
+    """Pure-Python streaming SQL dump generator as fallback when mysqldump is unavailable."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(db.bind)
+    table_names = inspector.get_table_names()
+
+    header = (
+        f"-- Multi-Engine Database Backup (SQL Export)\n"
+        f"-- Generated at: {datetime.now().isoformat()}\n"
+        f"-- Database: {database_name}\n\n"
+        f"SET FOREIGN_KEY_CHECKS=0;\n\n"
+    )
+    yield header.encode("utf-8")
+
+    for table in table_names:
+        yield f"-- ----------------------------\n-- Table structure and data for `{table}`\n-- ----------------------------\n".encode("utf-8")
+        yield f"DROP TABLE IF EXISTS `{table}`;\n".encode("utf-8")
+        try:
+            create_res = db.execute(text(f"SHOW CREATE TABLE `{table}`")).fetchone()
+            if create_res and len(create_res) > 1:
+                yield f"{create_res[1]};\n\n".encode("utf-8")
+        except Exception:
+            pass
+
+        rows = db.execute(text(f"SELECT * FROM `{table}`")).fetchall()
+        if rows:
+            for row in rows:
+                values = []
+                for val in row:
+                    if val is None:
+                        values.append("NULL")
+                    elif isinstance(val, (int, float)):
+                        values.append(str(val))
+                    elif isinstance(val, (datetime, date)):
+                        values.append(f"'{val.isoformat()}'")
+                    elif isinstance(val, bytes):
+                        values.append(f"X'{val.hex()}'")
+                    else:
+                        escaped = str(val).replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")
+                        values.append(f"'{escaped}'")
+                yield f"INSERT INTO `{table}` VALUES ({', '.join(values)});\n".encode("utf-8")
+            yield b"\n"
+
+    yield b"SET FOREIGN_KEY_CHECKS=1;\n"
+
+
+def stream_mysqldump_process(
+    mysqldump_bin: str,
+    host: str,
+    port: int,
+    user: str,
+    password: str,
+    database: str,
+) -> Iterator[bytes]:
+    """Stream mysqldump stdout in 64KB chunks."""
+    import os
+    import subprocess
+    args = [mysqldump_bin, "-h", host, "-P", str(port), "-u", user]
+    # Pass the password via environment so it never appears in the process list.
+    env = {**os.environ, "MYSQL_PWD": password} if password else None
+    args.extend(["--databases", database, "--single-transaction", "--routines", "--triggers"])
+
+    proc = subprocess.Popen(
+        args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+    )
+    try:
+        while True:
+            chunk = proc.stdout.read(65536)
+            if not chunk:
+                break
+            yield chunk
+    finally:
+        if proc.stdout:
+            proc.stdout.close()
+        if proc.stderr:
+            proc.stderr.close()
+        proc.wait()
+
+
 @router.get("/admin/backup")
 def admin_backup(request: Request, db: Session = Depends(get_db)) -> StreamingResponse:
-    """Download SQLite database backup for admin."""
+    """Download database backup (multi-engine: MySQL & SQLite) for admin."""
     current_user = get_current_user(request, db)
-    if not current_user or current_user.role != "admin":
+    if not current_user:
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    if current_user.role != "admin":
         return RedirectResponse("/dashboard", status_code=status.HTTP_303_SEE_OTHER)
 
     from app.config import settings
+    from sqlalchemy.engine import make_url
     import pathlib, shutil, tempfile
 
     db_url = settings.database_url
-    if not db_url.startswith("sqlite"):
-        return RedirectResponse("/dashboard?error=Backup hanya tersedia untuk SQLite.", status_code=status.HTTP_303_SEE_OTHER)
+    parsed_url = make_url(db_url)
+    backend = parsed_url.get_backend_name().lower()
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 
-    db_path = db_url.replace("sqlite:///", "").replace("sqlite://", "")
-    if not pathlib.Path(db_path).exists():
-        return RedirectResponse("/dashboard?error=File database tidak ditemukan.", status_code=status.HTTP_303_SEE_OTHER)
+    if backend == "sqlite":
+        db_path = parsed_url.database or ""
+        if not pathlib.Path(db_path).exists():
+            clean_path = db_url.replace("sqlite:///", "").replace("sqlite://", "")
+            if pathlib.Path(clean_path).exists():
+                db_path = clean_path
+            else:
+                return RedirectResponse("/dashboard?error=File database SQLite tidak ditemukan.", status_code=status.HTTP_303_SEE_OTHER)
 
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
-    shutil.copy2(db_path, tmp.name)
-    tmp.close()
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
+        shutil.copy2(db_path, tmp.name)
+        tmp.close()
 
-    log_admin_action(db, current_user.id, "backup_database", None, "Download backup database",
-                     request.client.host if request.client else None)
-    db.commit()
+        log_admin_action(db, current_user.id, "backup_database", None, "Download backup database (SQLite)",
+                         request.client.host if request.client else None)
+        db.commit()
 
-    filename = f"backup-pkl-{datetime.now().strftime('%Y%m%d-%H%M%S')}.db"
+        filename = f"backup-pkl-{timestamp}.db"
 
-    def _stream():
-        with open(tmp.name, "rb") as f:
-            yield from iter(lambda: f.read(65536), b"")
-        pathlib.Path(tmp.name).unlink(missing_ok=True)
+        def _stream_sqlite():
+            with open(tmp.name, "rb") as f:
+                yield from iter(lambda: f.read(65536), b"")
+            pathlib.Path(tmp.name).unlink(missing_ok=True)
 
-    return StreamingResponse(
-        _stream(),
-        media_type="application/octet-stream",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
+        return StreamingResponse(
+            _stream_sqlite(),
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+
+    elif backend in {"mysql", "mariadb"}:
+        host = parsed_url.host or "127.0.0.1"
+        port = parsed_url.port or 3306
+        user = parsed_url.username or "root"
+        password = parsed_url.password or ""
+        database_name = parsed_url.database or "absensi"
+
+        log_admin_action(db, current_user.id, "backup_database", None, f"Download backup database (MySQL: {database_name})",
+                         request.client.host if request.client else None)
+        db.commit()
+
+        filename = f"backup-pkl-{timestamp}.sql"
+        mysqldump_bin = find_mysqldump()
+
+        if mysqldump_bin:
+            generator = stream_mysqldump_process(
+                mysqldump_bin=mysqldump_bin,
+                host=host,
+                port=port,
+                user=user,
+                password=password,
+                database=database_name,
+            )
+        else:
+            generator = generate_mysql_dump_python(db, database_name)
+
+        return StreamingResponse(
+            generator,
+            media_type="application/sql",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+
+    else:
+        # Fallback for any other database backend via pure-python generator
+        database_name = parsed_url.database or "backup"
+        log_admin_action(db, current_user.id, "backup_database", None, f"Download backup database ({backend})",
+                         request.client.host if request.client else None)
+        db.commit()
+        filename = f"backup-pkl-{timestamp}.sql"
+        return StreamingResponse(
+            generate_mysql_dump_python(db, database_name),
+            media_type="application/sql",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
 
 
 @router.get("/institutions")
@@ -784,17 +1032,25 @@ def update_institution_geofence(
 
 
 @router.get("/assessments")
-def assessments_page(request: Request, db: Session = Depends(get_db)) -> object:
+def assessments_page(request: Request, scope: str = "bidang", db: Session = Depends(get_db)) -> object:
     current_user = get_current_user(request, db)
     if not current_user:
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
 
+    from app.routers.web import resolve_supervisor_bidang_scope
     can_manage_assessment = current_user.role in {"admin", "pembimbing"}
     assessments_page_title = "Penilaian Peserta" if can_manage_assessment else "Nilai Saya"
+    bidang_scope = resolve_supervisor_bidang_scope(db, current_user, scope)
 
     if can_manage_assessment:
-        assessments = db.query(Assessment).order_by(Assessment.id.desc()).limit(200).all()
-        participants = db.query(Participant).all()
+        aq = db.query(Assessment)
+        pq = db.query(Participant)
+        if bidang_scope["allowed_user_ids"] is not None:
+            allowed_ids = bidang_scope["allowed_user_ids"]
+            aq = aq.filter(Assessment.user_id.in_(allowed_ids)) if allowed_ids else aq.filter(Assessment.id == -1)
+            pq = pq.filter(Participant.user_id.in_(allowed_ids)) if allowed_ids else pq.filter(Participant.id == -1)
+        assessments = aq.order_by(Assessment.id.desc()).limit(200).all()
+        participants = pq.order_by(Participant.nama_lengkap.asc()).all()
     else:
         assessments = (
             db.query(Assessment)
@@ -803,7 +1059,13 @@ def assessments_page(request: Request, db: Session = Depends(get_db)) -> object:
             .limit(200)
             .all()
         )
-        participants = []
+        participants = db.query(Participant).filter(Participant.user_id == current_user.id).all()
+
+    user_ids = {a.user_id for a in assessments if a.user_id} | {p.user_id for p in participants if p.user_id}
+    participant_map = {
+        p.user_id: p
+        for p in (db.query(Participant).filter(Participant.user_id.in_(user_ids)).all() if user_ids else [])
+    }
 
     return render_with_user(
         request,
@@ -811,8 +1073,10 @@ def assessments_page(request: Request, db: Session = Depends(get_db)) -> object:
         {
             "assessments": assessments,
             "participants": participants,
+            "participant_map": participant_map,
             "can_manage_assessment": can_manage_assessment,
             "assessments_page_title": assessments_page_title,
+            "bidang_scope": bidang_scope,
         },
         current_user,
     )
@@ -836,10 +1100,55 @@ def create_assessment(
     if not target_user:
         return RedirectResponse("/assessments", status_code=status.HTTP_303_SEE_OTHER)
 
-    assessment = Assessment(user_id=user_id, nilai=nilai, catatan=catatan)
+    clamped_nilai = max(0, min(100, int(nilai)))
+    assessment = Assessment(user_id=user_id, nilai=clamped_nilai, catatan=catatan.strip())
     db.add(assessment)
+    log_activity(db, current_user.id, "create_assessment", f"Input nilai {clamped_nilai} untuk user_id={user_id}")
     db.commit()
-    return RedirectResponse("/assessments", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse("/assessments?success=Penilaian peserta berhasil disimpan.", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/assessments/{assessment_id}/edit")
+def edit_assessment(
+    assessment_id: int,
+    request: Request,
+    nilai: int = Form(...),
+    catatan: str = Form(""),
+    db: Session = Depends(get_db),
+) -> object:
+    current_user = get_current_user(request, db)
+    if not current_user or current_user.role not in {"admin", "pembimbing"}:
+        return RedirectResponse("/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+
+    assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
+    if not assessment:
+        return RedirectResponse("/assessments?error=Data penilaian tidak ditemukan.", status_code=status.HTTP_303_SEE_OTHER)
+
+    assessment.nilai = max(0, min(100, int(nilai)))
+    assessment.catatan = catatan.strip()
+    log_activity(db, current_user.id, "edit_assessment", f"Ubah nilai #{assessment.id} menjadi {assessment.nilai}")
+    db.commit()
+    return RedirectResponse("/assessments?success=Nilai peserta berhasil diperbarui.", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/assessments/{assessment_id}/delete")
+def delete_assessment(
+    assessment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> object:
+    current_user = get_current_user(request, db)
+    if not current_user or current_user.role not in {"admin", "pembimbing"}:
+        return RedirectResponse("/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+
+    assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
+    if not assessment:
+        return RedirectResponse("/assessments?error=Data penilaian tidak ditemukan.", status_code=status.HTTP_303_SEE_OTHER)
+
+    db.delete(assessment)
+    log_activity(db, current_user.id, "delete_assessment", f"Hapus penilaian #{assessment_id}")
+    db.commit()
+    return RedirectResponse("/assessments?success=Data penilaian berhasil dihapus.", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/face-logs")

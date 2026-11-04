@@ -5,15 +5,34 @@
 {% block page_title %}{{ journal_page_title }}{% endblock %}
 
 {% block content %}
-{% set journal_stats = namespace(approved=0, pending=0, rejected=0, other=0) %}
+{% if bidang_scope and bidang_scope.is_supervisor and bidang_scope.supervisor_bidang %}
+<div class="alert alert-info d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <strong>Filter Bidang Pembimbing: {{ bidang_scope.supervisor_bidang }}</strong>
+    <span class="small d-block text-muted">
+      {% if bidang_scope.scope == 'bidang' %}
+        Menampilkan jurnal kegiatan peserta yang ditempatkan di bidang <strong>{{ bidang_scope.supervisor_bidang }}</strong>.
+      {% else %}
+        Menampilkan seluruh jurnal peserta lintas bidang.
+      {% endif %}
+    </span>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/journal?scope=bidang" class="btn btn-sm {% if bidang_scope.scope == 'bidang' %}btn-primary{% else %}btn-outline-primary{% endif %}">Bidang Saya ({{ bidang_scope.supervisor_bidang }})</a>
+    <a href="/journal?scope=all" class="btn btn-sm {% if bidang_scope.scope == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">Semua Bidang</a>
+  </div>
+</div>
+{% endif %}
+
+{% set journal_stats = namespace(approved=0, pending=0, revisi=0, other=0) %}
 {% for item in journals %}
   {% set status = (item.status or '')|lower %}
   {% if status in ['approved', 'disetujui', 'valid'] %}
     {% set journal_stats.approved = journal_stats.approved + 1 %}
   {% elif status in ['pending', 'draft', 'menunggu'] %}
     {% set journal_stats.pending = journal_stats.pending + 1 %}
-  {% elif status in ['rejected', 'ditolak', 'invalid'] %}
-    {% set journal_stats.rejected = journal_stats.rejected + 1 %}
+  {% elif status in ['revisi', 'rejected', 'ditolak', 'invalid'] %}
+    {% set journal_stats.revisi = journal_stats.revisi + 1 %}
   {% else %}
     {% set journal_stats.other = journal_stats.other + 1 %}
   {% endif %}
@@ -30,31 +49,55 @@
         </svg>
       </span>
       <div>
-      <h5 class="mb-0">{{ journal_page_title }}</h5>
+        <h5 class="mb-0">{{ journal_page_title }}</h5>
+        <p class="text-muted small mb-0">
+          {% if can_manage_journal %}
+            Review kegiatan peserta, berikan arahan revisi, dan terbitkan Barcode Pengesahan Pembimbing.
+          {% else %}
+            Catat kegiatan harian PKL Anda. Jurnal yang telah disahkan pembimbing akan dilengkapi QR Barcode resmi.
+          {% endif %}
+        </p>
       </div>
     </div>
-    <span class="summary-badge">{{ journals|length }} entri</span>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      {% if not can_manage_journal %}
+      <a href="/journal/print" target="_blank" rel="noopener" class="btn btn-sm btn-primary">
+        Cetak Lembar Jurnal &amp; Barcode Pembimbing
+      </a>
+      {% elif users %}
+      <form method="get" action="/journal/print" target="_blank" class="d-flex align-items-center gap-1">
+        <select class="form-select form-select-sm" name="user_id" style="max-width:210px">
+          {% for user in users %}
+          {% set p_opt = participant_map.get(user.id) if participant_map else None %}
+          <option value="{{ user.id }}">{{ p_opt.nama_lengkap if p_opt else user.username }}{% if p_opt and p_opt.bidang %} ({{ p_opt.bidang }}){% endif %}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">Cetak Jurnal</button>
+      </form>
+      {% endif %}
+      <span class="summary-badge">{{ journals|length }} entri</span>
+    </div>
   </div>
   <div class="row g-2 mt-2 mini-metric-row">
-    <div class="col-sm-3">
+    <div class="col-6 col-sm-3">
       <div class="mini-metric mini-metric-high">
-        <span class="mini-metric-label">Disetujui</span>
+        <span class="mini-metric-label">Disahkan</span>
         <strong class="mini-metric-value">{{ journal_stats.approved }}</strong>
       </div>
     </div>
-    <div class="col-sm-3">
+    <div class="col-6 col-sm-3">
       <div class="mini-metric mini-metric-mid">
-        <span class="mini-metric-label">Menunggu</span>
+        <span class="mini-metric-label">Menunggu Review</span>
         <strong class="mini-metric-value">{{ journal_stats.pending }}</strong>
       </div>
     </div>
-    <div class="col-sm-3">
+    <div class="col-6 col-sm-3">
       <div class="mini-metric mini-metric-low">
-        <span class="mini-metric-label">Ditolak</span>
-        <strong class="mini-metric-value">{{ journal_stats.rejected }}</strong>
+        <span class="mini-metric-label">Perlu Revisi</span>
+        <strong class="mini-metric-value">{{ journal_stats.revisi }}</strong>
       </div>
     </div>
-    <div class="col-sm-3">
+    <div class="col-6 col-sm-3">
       <div class="mini-metric mini-metric-neutral">
         <span class="mini-metric-label">Lainnya</span>
         <strong class="mini-metric-value">{{ journal_stats.other }}</strong>
@@ -64,85 +107,154 @@
 </section>
 
 <section class="panel-card mb-3 panel-elevated">
-  <h5>{% if can_manage_journal %}Tambah &amp; Verifikasi{% else %}Tambah Jurnal{% endif %}</h5>
-  <form method="post" class="row g-2 mt-1">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+      <h5 class="mb-0">{% if can_manage_journal %}Catat Jurnal Kegiatan Peserta{% else %}Formulir Jurnal Kegiatan Hari Ini{% endif %}</h5>
+      <small class="text-muted">Tuliskan kegiatan dan hasil kerja dengan jelas agar pembimbing dapat memverifikasi dan menerbitkan Barcode QR.</small>
+    </div>
+    {% if not can_manage_journal %}
+    <span class="badge text-bg-light border text-muted">Maks. 3 entri/hari • Min. 10 karakter</span>
+    {% endif %}
+  </div>
+  <form method="post" class="row g-3">
     {% if can_manage_journal %}
-    <div class="col-lg-3">
+    <div class="col-md-12">
+      <label class="form-label fw-semibold mb-1">Pilih Peserta PKL <span class="text-danger">*</span></label>
       <select class="form-select" name="user_id" required>
         {% for user in users %}
-        <option value="{{ user.id }}">{{ user.username }}</option>
+        {% set p_info = participant_map.get(user.id) if participant_map else None %}
+        <option value="{{ user.id }}">{{ p_info.nama_lengkap if p_info else user.username }}{% if p_info and p_info.bidang %} (Bidang: {{ p_info.bidang }}){% endif %}</option>
         {% endfor %}
       </select>
     </div>
-    <div class="col-lg-5"><input class="form-control" name="kegiatan" placeholder="Kegiatan" required></div>
-    <div class="col-lg-3"><input class="form-control" name="output" placeholder="Output"></div>
-    {% else %}
-    <div class="col-lg-8"><input class="form-control" name="kegiatan" placeholder="Kegiatan" required></div>
-    <div class="col-lg-3"><input class="form-control" name="output" placeholder="Output"></div>
     {% endif %}
-    <div class="col-lg-1"><button class="btn btn-primary w-100">Simpan</button></div>
+    <div class="col-md-7">
+      <label class="form-label fw-semibold mb-1">Uraian Kegiatan / Pekerjaan yang Dilakukan <span class="text-danger">*</span></label>
+      <textarea class="form-control" name="kegiatan" rows="3" minlength="10" placeholder="Jelaskan secara rinci kegiatan atau tugas yang Anda kerjakan hari ini (minimal 10 karakter)…" required></textarea>
+      <small class="text-muted">Contoh: Melakukan pengecekan jaringan LAN di ruang bidang Aptika dan membantu rekapitulasi dokumen surat masuk.</small>
+    </div>
+    <div class="col-md-5">
+      <label class="form-label fw-semibold mb-1">Hasil / Output / Bukti Pekerjaan</label>
+      <textarea class="form-control" name="output" rows="3" placeholder="Tuliskan hasil yang dicapai, jumlah dokumen/unit yang selesai, tautan hasil, atau kendala yang dihadapi…"></textarea>
+      <small class="text-muted">Contoh: 15 dokumen terdata di sistem, jaringan kembali normal, tidak ada kendala.</small>
+    </div>
+    <div class="col-12 d-flex justify-content-end">
+      <button class="btn btn-primary px-4 py-2 fw-semibold" type="submit">Simpan &amp; Kirim Jurnal Hari Ini</button>
+    </div>
   </form>
 </section>
 
 <section class="panel-card panel-elevated">
-  <h5>Daftar Jurnal</h5>
+  <h5>Daftar Jurnal &amp; Pengesahan Pembimbing</h5>
   <div class="table-responsive mt-2">
     <table class="table table-hover align-middle journal-table">
       <thead>
         <tr>
           <th>#</th>
-          {% if can_manage_journal %}<th>User</th>{% endif %}
-          <th>Kegiatan</th>
-          <th>Output</th>
-          <th>Komentar</th>
+          {% if can_manage_journal %}<th>Peserta &amp; Bidang</th>{% endif %}
+          <th>Tanggal &amp; Kegiatan</th>
+          <th>Output / Hasil</th>
+          <th>Arahan / Catatan Pembimbing</th>
           <th>Status</th>
-          {% if can_manage_journal %}<th>Aksi</th>{% endif %}
-          <th>Barcode Verifikasi</th>
+          {% if can_manage_journal %}<th>Pengesahan</th>{% endif %}
+          <th>Ruang Barcode Pembimbing</th>
         </tr>
       </thead>
       <tbody>
         {% for item in journals %}
         {% set status = (item.status or '')|lower %}
         {% set signature = signature_links.get(item.id) %}
+        {% set p_info = participant_map.get(item.user_id) if participant_map else None %}
         <tr>
           <td>{{ item.id }}</td>
-          {% if can_manage_journal %}<td>{{ item.user.username if item.user else ('User ' ~ item.user_id) }}</td>{% endif %}
-          <td>{{ item.kegiatan }}</td>
-          <td>{{ item.output or '-' }}</td>
+          {% if can_manage_journal %}
           <td>
+            <div class="fw-semibold">{{ p_info.nama_lengkap if p_info else (item.user.username if item.user else ('User ' ~ item.user_id)) }}</div>
+            {% if p_info and p_info.bidang %}
+            <span class="badge text-bg-info mt-1">{{ p_info.bidang }}</span>
+            {% elif item.user %}
+            <small class="text-muted">@{{ item.user.username }}</small>
+            {% endif %}
+          </td>
+          {% endif %}
+          <td style="min-width:220px">
+            {% if item.tanggal %}
+            <small class="text-muted d-block mb-1">{{ item.tanggal.strftime('%d/%m/%Y %H:%M') }}</small>
+            {% endif %}
+            <div>{{ item.kegiatan }}</div>
+            {% if not can_manage_journal and not item.signature_token and status in ['pending', 'draft', 'menunggu', 'revisi'] %}
+            <button class="btn btn-sm btn-outline-primary mt-2" type="button" data-bs-toggle="collapse" data-bs-target="#editJournal{{ item.id }}" aria-expanded="false">
+              {% if status == 'revisi' %}Perbaiki Jurnal (Revisi){% else %}Edit Jurnal{% endif %}
+            </button>
+            <div class="collapse mt-2" id="editJournal{{ item.id }}">
+              <form method="post" action="/journal/{{ item.id }}/edit" class="p-2 border rounded bg-body-tertiary d-flex flex-column gap-2">
+                <div>
+                  <label class="form-label small mb-1 fw-semibold">Perbaiki Uraian Kegiatan</label>
+                  <textarea class="form-control form-control-sm" name="kegiatan" rows="2" minlength="10" required>{{ item.kegiatan }}</textarea>
+                </div>
+                <div>
+                  <label class="form-label small mb-1 fw-semibold">Perbaiki Output / Hasil</label>
+                  <textarea class="form-control form-control-sm" name="output" rows="2">{{ item.output or '' }}</textarea>
+                </div>
+                <button class="btn btn-sm btn-primary align-self-start" type="submit">Simpan &amp; Ajukan Ulang</button>
+              </form>
+            </div>
+            {% endif %}
+          </td>
+          <td style="min-width:210px">
+            {% if item.output %}
+            <div class="p-2 rounded border bg-body-tertiary small" style="white-space:pre-line;line-height:1.45">{{ item.output }}</div>
+            {% else %}
+            <span class="text-muted small">-</span>
+            {% endif %}
+          </td>
+          <td style="min-width:230px">
             {% if can_manage_journal %}
-            <form method="post" action="/journal/{{ item.id }}/comment" class="d-flex gap-1">
-              <input class="form-control form-control-sm" name="komentar" value="{{ item.komentar or '' }}" placeholder="Tulis komentar…" style="min-width:130px">
-              <button class="btn btn-sm btn-outline-secondary" type="submit">Simpan</button>
+            <form method="post" action="/journal/{{ item.id }}/comment" class="d-flex flex-column gap-1">
+              <input class="form-control form-control-sm" name="komentar" value="{{ item.komentar or '' }}" placeholder="Tulis umpan balik / catatan revisi…">
+              <div class="d-flex flex-wrap gap-1">
+                <button class="btn btn-sm btn-outline-secondary" type="submit" name="status_review" value="">Simpan Catatan</button>
+                {% if not item.signature_token %}
+                <button class="btn btn-sm btn-outline-warning" type="submit" name="status_review" value="revisi">Minta Revisi</button>
+                {% endif %}
+              </div>
             </form>
             {% else %}
-            <span class="text-muted small">{{ item.komentar or '-' }}</span>
+              {% if item.komentar %}
+              <div class="p-2 rounded border {% if status == 'revisi' %}border-warning bg-warning-subtle{% else %}bg-body-tertiary{% endif %} small">
+                <strong class="d-block mb-1">{% if status == 'revisi' %}Catatan Revisi Pembimbing:{% else %}Catatan Pembimbing:{% endif %}</strong>
+                {{ item.komentar }}
+              </div>
+              {% else %}
+              <span class="text-muted small">Belum ada catatan</span>
+              {% endif %}
             {% endif %}
           </td>
           <td>
-            <span class="badge text-bg-light border text-capitalize journal-status {% if status in ['approved', 'disetujui', 'valid'] %}status-pill-high{% elif status in ['pending', 'draft', 'menunggu'] %}status-pill-mid{% elif status in ['rejected', 'ditolak', 'invalid'] %}status-pill-low{% else %}status-pill-neutral{% endif %}">
-              {{ item.status }}
+            <span class="badge text-bg-light border text-capitalize journal-status {% if status in ['approved', 'disetujui', 'valid'] %}status-pill-high{% elif status in ['pending', 'draft', 'menunggu'] %}status-pill-mid{% elif status in ['revisi', 'rejected', 'ditolak', 'invalid'] %}status-pill-low{% else %}status-pill-neutral{% endif %}">
+              {% if status == 'revisi' %}Perlu Revisi{% elif status == 'approved' %}Disahkan{% else %}{{ item.status }}{% endif %}
             </span>
           </td>
           {% if can_manage_journal %}
           <td>
             {% if item.signature_token %}
-            <span class="badge text-bg-success">Sudah Signed</span>
+            <span class="badge text-bg-success">Sudah Disahkan</span>
             {% else %}
             <form method="post" action="/journal/{{ item.id }}/sign" class="d-inline">
-              <button class="btn btn-sm btn-outline-primary">Teken Pembimbing</button>
+              <button class="btn btn-sm btn-primary">Teken &amp; Terbitkan QR</button>
             </form>
             {% endif %}
           </td>
           {% endif %}
-          <td>
+          <td class="text-center" style="min-width:140px">
             {% if signature %}
-            <div class="d-flex flex-column gap-2 align-items-start">
-              <img src="{{ signature.qr_url }}" alt="QR verifikasi jurnal {{ item.id }}" width="92" height="92" loading="lazy" class="rounded border">
-              <a href="{{ signature.verify_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">Buka Identitas</a>
-            </div>
+            <a href="{{ signature.verify_url }}" target="_blank" rel="noopener" class="d-inline-block p-1 rounded border bg-white" title="Scan atau klik Barcode untuk melihat Profil Pembimbing">
+              <img src="{{ signature.qr_url }}" alt="QR Barcode Profil Pembimbing" width="88" height="88" loading="lazy" class="d-block">
+            </a>
             {% else %}
-            <span class="text-muted small">Belum tersedia</span>
+            <div class="p-2 rounded border border-dashed text-center text-muted small d-inline-block" style="max-width:150px;border-style:dashed!important">
+              <span class="d-block fw-semibold" style="font-size:.74rem">Menunggu QR</span>
+            </div>
             {% endif %}
           </td>
         </tr>
